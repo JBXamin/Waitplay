@@ -12,7 +12,7 @@ const App = () => {
     const [showOrderSummary, setShowOrderSummary] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isManualScroll, setIsManualScroll] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('');
+    const [activeFilters, setActiveFilters] = useState(['All']); // Default to "All" selected
     const bannerRef = useRef(null);
 
     useEffect(() => {
@@ -108,12 +108,27 @@ const App = () => {
     };
 
     const handleFilter = (filter) => {
-        setActiveFilter(filter);
+        if (filter === 'All') {
+            setActiveFilters((prevFilters) => 
+                prevFilters.includes('All') && prevFilters.length === categories.length + 1
+                    ? [] // Deselect all
+                    : ['All', ...categories] // Select all
+            );
+        } else {
+            setActiveFilters((prevFilters) => {
+                if (prevFilters.includes(filter)) {
+                    const updatedFilters = prevFilters.filter((f) => f !== filter);
+                    return updatedFilters.length === 0 ? ['All'] : updatedFilters;
+                } else {
+                    return [...prevFilters.filter((f) => f !== 'All'), filter];
+                }
+            });
+        }
     };
 
-    const filteredProducts = activeFilter
-        ? products.filter((product) => product.category === activeFilter)
-        : products;
+    const filteredProducts = activeFilters.includes('All') || activeFilters.length === 0
+        ? products
+        : products.filter((product) => activeFilters.includes(product.category));
 
     return (
         <div className="app-container">
@@ -139,21 +154,21 @@ const App = () => {
             </div>
 
             <div className="filter-container">
+                <button
+                    className={`filter-button ${activeFilters.includes('All') ? 'active' : ''}`}
+                    onClick={() => handleFilter('All')}
+                >
+                    All
+                </button>
                 {categories.map((category) => (
                     <button
                         key={category}
-                        className={`filter-button ${activeFilter === category ? 'active' : ''}`}
+                        className={`filter-button ${activeFilters.includes(category) ? 'active' : ''}`}
                         onClick={() => handleFilter(category)}
                     >
                         {category}
                     </button>
                 ))}
-                <button
-                    className={`filter-button ${!activeFilter ? 'active' : ''}`}
-                    onClick={() => handleFilter('')}
-                >
-                    All
-                </button>
             </div>
 
             <main className="product-list">

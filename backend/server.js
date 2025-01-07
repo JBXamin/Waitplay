@@ -1,3 +1,5 @@
+//server.js
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -24,25 +26,39 @@ const productSchema = new mongoose.Schema({
   halfPrice: Number,
   fullPrice: Number,
   specialItems: [String],
-  category: String, // Added category field
+  category: String,
+  type: String // Added type field for Veg/Non-Veg filtering
 });
 
 const Product = mongoose.model('Product', productSchema);
 
-// Fetch products
+// Fetch products with optional filter by type
 app.get('/products', async (req, res) => {
   try {
-    const products = await Product.find();
+    const { type, category } = req.query;
+    let filter = {};
+    
+    if (type) filter.type = type;
+    if (category) filter.category = category; // Add category filtering
+    
+    const products = await Product.find(filter);
     res.json(products);
   } catch (err) {
     res.status(500).send('Server error: ' + err.message);
   }
 });
 
-// Fetch unique categories
+// Fetch unique categories based on type
 app.get('/categories', async (req, res) => {
   try {
-    const categories = await Product.distinct('category');
+    const { type } = req.query; // Get type from query parameters
+    let filter = {};
+
+    if (type) {
+      filter.type = type.toLowerCase(); // Apply filter only if type is specified
+    }
+
+    const categories = await Product.distinct('category', filter); // Get distinct categories based on filter
     res.json(categories);
   } catch (err) {
     res.status(500).send('Server error: ' + err.message);

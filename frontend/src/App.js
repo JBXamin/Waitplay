@@ -71,7 +71,6 @@ const App = () => {
                             {
                                 _id: productId,
                                 title: product.title,
-                                image: product.image,
                                 type,
                                 price: type === 'Half' ? product.halfPrice : product.fullPrice,
                                 quantity: newQuantity,
@@ -95,16 +94,6 @@ const App = () => {
 
     const closeProductDetails = () => {
         setSelectedProduct(null);
-    };
-
-    const calculateSubtotal = () => {
-        return cart.reduce((total, item) => total + item.price * item.quantity, 0);
-    };
-
-    const calculateGrandTotal = () => {
-        const subtotal = calculateSubtotal();
-        const tax = subtotal * 0.05; 
-        return subtotal + tax;
     };
 
     const handleFilter = (filter) => {
@@ -240,7 +229,7 @@ const App = () => {
             {selectedProduct && (
                 <div className="popup-overlay">
                     <div className="product-details-popup slide-up">
-                        <button className="back-arrow bold" onClick={closeProductDetails}>&larr;</button>
+                        <button onClick={closeProductDetails} className="close-kmore">X</button>
                         <img className="details-image" src={selectedProduct.image} alt={selectedProduct.title} />
                         <div className="details-content">
                             <h3>{selectedProduct.title}</h3>
@@ -265,43 +254,57 @@ const App = () => {
                     />
                     <span className="cart-badge">{cart.reduce((total, item) => total + item.quantity, 0)}</span>
                 </div>
-                <button onClick={toggleOrderSummary} className="summary-button">Order Summary</button>
+                <button onClick={toggleOrderSummary} className="summary-button">Order Summary ></button>
                 <button className="place-order" style={{
-                    backgroundColor: cart.length === 0 ? 'lightgreen' : 'darkgreen',
-                    color: 'white', // Optional for better contrast
+                    backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
+                    color: 'white',
                 }}>Play Order</button>
             </footer>
 
             {showOrderSummary && (
-                <div className="popup-overlay">
-                    <div className="order-summary-popup slide-up">
-                        <h3>Your Cart</h3>
-                        <ul className="order-list scrollable">
-                            {cart.map((item) => (
-                                <li key={`${item._id}-${item.type}`} className="order-item">
-                                    <img src={item.image} alt={item.title} className="order-item-image" />
-                                    <div className="order-item-details">
-                                        <div className="item-title">{item.title} ({item.type})</div>
-                                        <div className="quantity-control styled-control">
-                                            <span className="quantity-label">Quantity</span>
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, -1)}>-</button>
-                                            <span>{item.quantity}</span>
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, 1)}>+</button>
-                                        </div>
-                                        <div className="item-price">Price: ₹{item.price * item.quantity}</div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                        <div className="order-summary-footer">
-                            <div className="subtotal">Subtotal: ₹{calculateSubtotal()}</div>
-                            <div className="tax">Tax: ₹{(calculateSubtotal() * 0.05).toFixed(2)}</div>
-                            <div className="grand-total">Grand Total: ₹{calculateGrandTotal().toFixed(2)}</div>
+                <div className="order-summary-container">
+                    <div className="order-summary slide-up">
+                        <div className="order-summary-header">
+                            <div className="cart-container">
+                                <div className= "new-cart">
+                                    <img
+                                        src="https://i.pinimg.com/originals/e2/06/3e/e2063ef31174bff0e81d1bb641b5f3f3.png" 
+                                        alt="Cart"
+                                        className="cart-icon"
+                                    />
+                                    <span className="cart-badge">{cart.reduce((total, item) => total + item.quantity, 0)}</span>
+                                </div>
+                            </div>
+                            <div className="summary-text">Order Summary </div>
+                            <button onClick={toggleOrderSummary} className="close-summary">X</button>
                         </div>
-                        <button onClick={toggleOrderSummary} className="summary-close">Close</button>
+                        <table className="order-list scrollable">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {cart.map((item, index) => (
+                                    <tr key={`${item._id}-${item.type}`} className="order-item">
+                                        <td>{index + 1}</td>
+                                        <td>{item.title} ({item.type})</td>
+                                        <td>{item.quantity}</td>
+                                        <td>₹{item.price * item.quantity}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
+                        <button className="place-order cart" style={{
+                        backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
+                        color: 'white', // Optional for better contrast
+                        }}>Play Order</button>      
                 </div>
             )}
+            
         </div>
     );
 };

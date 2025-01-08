@@ -13,8 +13,8 @@ const ItemsPage = () => {
     const [isManualScroll, setIsManualScroll] = useState(false);
     const [activeFilters, setActiveFilters] = useState(['All']); // Default to "All" selected
     const bannerRef = useRef(null);
+    const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
-    const category = queryParams.get('category');
     const type = queryParams.get('category') || 'all';
 
     useEffect(() => {
@@ -29,15 +29,10 @@ const ItemsPage = () => {
 
     useEffect(() => {
         axios
-            .get(`http://localhost:5000/products?type=${type}&category=${category}`)
-            .then((response) => setProducts(response.data))
-            .catch((error) => console.error('Error fetching products:', error));
-    
-        axios
-            .get(`http://localhost:5000/categories?type=${type}`)
-            .then((response) => setCategories(response.data))
-            .catch((error) => console.error('Error fetching categories:', error));
-    }, [type, category]);
+          .get(`http://localhost:5000/products?type=${type}`)
+          .then((response) => setProducts(response.data))
+          .catch((error) => console.error('Error fetching products:', error));
+      }, [type]);
 
     useEffect(() => {
         let interval;

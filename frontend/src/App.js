@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import SelectionPage from './pages/SelectionPage.js';
 import ItemsPage from './pages/ItemPage.js';
+import WaitPlay from './pages/waitplay.js';
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Routes>
         <Route path="/" element={<SelectionPage />} />
         <Route path="/items" element={<ItemsPage />} />
+        <Route path="/waitplay" element={<WaitPlay/>}/>
       </Routes>
     </Router>
   );

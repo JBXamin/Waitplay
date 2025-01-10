@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 mongoose
-  .connect("mongodb+srv://Waitplay:Waitplay@cluster0.u4tx7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+  .connect("mongodb+srv://waitplay:q1w2e3r4@cluster0.5nvww.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
   .then(() => console.log('MongoDB Connected'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
@@ -37,10 +37,10 @@ app.get('/products', async (req, res) => {
   try {
     const { type, category } = req.query;
     let filter = {};
-    
-    if (type) filter.type = type;
-    if (category) filter.category = category; // Add category filtering
-    
+
+    if (type && type !== 'all') filter.type = type.toLowerCase();
+    if (category && category !== 'all') filter.category = category.toLowerCase();
+
     const products = await Product.find(filter);
     res.json(products);
   } catch (err) {
@@ -48,22 +48,20 @@ app.get('/products', async (req, res) => {
   }
 });
 
-// Fetch unique categories based on type
 app.get('/categories', async (req, res) => {
   try {
-    const { type } = req.query; // Get type from query parameters
+    const { type } = req.query;
     let filter = {};
 
-    if (type) {
-      filter.type = type.toLowerCase(); // Apply filter only if type is specified
-    }
+    if (type && type !== 'all') filter.type = type.toLowerCase();
 
-    const categories = await Product.distinct('category', filter); // Get distinct categories based on filter
+    const categories = await Product.distinct('category', filter);
     res.json(categories);
   } catch (err) {
     res.status(500).send('Server error: ' + err.message);
   }
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

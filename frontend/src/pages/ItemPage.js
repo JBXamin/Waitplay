@@ -1,6 +1,9 @@
+//itempage.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import './ItemPage.css';
 
 const ItemsPage = () => {
@@ -16,16 +19,19 @@ const ItemsPage = () => {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const type = queryParams.get('category') || 'all';
+    const category = queryParams.get('category');
+    const [dropdownOpen, setDropdownOpen] = useState(false);
 
-    useEffect(() => {
-        axios.get('http://localhost:5000/products')
-            .then((response) => setProducts(response.data))
-            .catch((error) => console.error('Error fetching products:', error));
 
-        axios.get('http://localhost:5000/categories')
-            .then((response) => setCategories(response.data))
-            .catch((error) => console.error('Error fetching categories:', error));
-    }, []);
+    const navigate = useNavigate();
+
+    const handlePlayOrder = () => {
+        if (cart.length > 0) {
+            navigate('/waitplay'); // Adjust the route path if needed
+        } else {
+            alert('Your cart is empty. Add items to play the order.');
+        }
+    };
 
     useEffect(() => {
         axios
@@ -33,6 +39,24 @@ const ItemsPage = () => {
           .then((response) => setProducts(response.data))
           .catch((error) => console.error('Error fetching products:', error));
       }, [type]);
+
+    useEffect(() => {
+        const fetchProductsAndCategories = async () => {
+            try {
+                const params = new URLSearchParams();
+                if (type && type !== 'all') params.append('type', type.toLowerCase());
+                if (category && category !== 'all') params.append('category', category.toLowerCase());
+    
+                const categoryResponse = await axios.get(`http://localhost:5000/categories?type=${type}`);
+                setCategories(categoryResponse.data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        };
+    
+        fetchProductsAndCategories();
+    }, [type, category]);
+    
 
     useEffect(() => {
         let interval;
@@ -130,12 +154,70 @@ const ItemsPage = () => {
 
     return (
         <div className="app-container">
-            <header className="header">
-                <div className="logo">PFC Wings</div>
-                <div className="search-bar">
-                    <input type="text" placeholder="Search for food..." />
-                </div>
-            </header>
+            <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#fff', boxShadow: '0px 1px 5px rgba(0, 0, 0, 0.1)' }}>
+    {/* Logo Section */}
+    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img
+            src="https://via.placeholder.com/40"
+            alt="Logo"
+            style={{ width: '40px', height: '40px', borderRadius: '5px' }}
+        />
+        <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>Logo</span>
+    </div>
+
+    {/* Share or Join Cart Button */}
+    <button
+        style={{
+            background: 'linear-gradient(to right, #f54ea2, #ff7676)',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            color: '#fff',
+            fontSize: '14px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+        }}
+    >
+        Share or Join Cart
+    </button>
+</header>
+
+<div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px' }}>
+    {/* Search Bar */}
+    <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '10px', padding: '5px 10px', width: '75%' }}>
+        <input
+            type="text"
+            placeholder="Search"
+            style={{
+                border: 'none',
+                outline: 'none',
+                flexGrow: 1,
+                padding: '10px',
+                fontSize: '14px',
+                borderRadius: '5px',
+            }}
+        />
+        <span style={{ fontSize: '18px', color: '#888', cursor: 'pointer' }}>🔍</span>
+    </div>
+
+    {/* Call Waiter Button */}
+    <button
+        style={{
+            background: '#8e44ad',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            color: '#fff',
+            fontSize: '14px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            marginLeft: '15px',
+        }}
+    >
+        Call Waiter
+    </button>
+</div>
+
 
             <div className="banner-container" onTouchStart={handleManualScroll} onMouseDown={handleManualScroll}>
                 <div className="banner-carousel" ref={bannerRef}>
@@ -151,23 +233,91 @@ const ItemsPage = () => {
                 </div>
             </div>
 
-            <div className="filter-container">
-                <button
-                    className={`filter-button ${activeFilters.includes('All') ? 'active' : ''}`}
-                    onClick={() => handleFilter('All')}
-                >
-                    All
-                </button>
-                {categories.map((category) => (
-                    <button
-                        key={category}
-                        className={`filter-button ${activeFilters.includes(category) ? 'active' : ''}`}
-                        onClick={() => handleFilter(category)}
-                    >
-                        {category}
-                    </button>
-                ))}
-            </div>
+            <div className="filter-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', marginLeft: '0', paddingLeft: '0', width: '90%' }}>
+    <div className="dropdown" style={{ position: 'relative', marginRight: '30px' }}>
+        <div
+            className="selected-category"
+            style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: type === 'veg' ? 'green' : type === 'non-veg' ? 'red' : type === 'drinks' ? 'blue' : 'purple',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+            }}
+            onClick={() => setDropdownOpen((prev) => !prev)}
+        >
+            <span
+                style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: type === 'veg' ? 'green' : type === 'non-veg' ? 'red' : type === 'drinks' ? 'blue' : 'purple',
+                }}
+            ></span>
+            {type.charAt(0).toUpperCase() + type.slice(1)}
+        </div>
+        {dropdownOpen && (
+            <ul
+                className="dropdown-menu"
+                style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    backgroundColor: 'white',
+                    border: '1px solid #ccc',
+                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+                    zIndex: 1000,
+                    listStyle: 'none',
+                    padding: '10px 0',
+                    margin: 0,
+                    width: '150px',
+                }}
+            >
+                {["veg", "non-veg", "drinks", "icecream"]
+                    .filter((category) => category.toLowerCase() !== type.toLowerCase())
+                    .map((category) => (
+                        <li
+                            key={category}
+                            style={{
+                                padding: '5px 15px',
+                                cursor: 'pointer',
+                                color: category === 'non-veg' ? 'red' : category === 'drinks' ? 'blue' : category === 'icecream' ? 'purple' : 'green',
+                            }}
+                            onClick={() => {
+                                navigate(`/items?category=${category.toLowerCase()}`);
+                                setDropdownOpen(false);
+                            }}
+                        >
+                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </li>
+                    ))}
+            </ul>
+        )}
+    </div>
+    <div style={{ display: 'flex', overflowX: 'scroll', gap: '10px', flexGrow: 1 }}>
+        <button
+            className={`filter-button ${activeFilters.includes('All') ? 'active' : ''}`}
+            onClick={() => handleFilter('All')}
+        >
+            All
+        </button>
+        {categories.map((category) => (
+            <button
+                key={category}
+                className={`filter-button ${activeFilters.includes(category) ? 'active' : ''}`}
+                onClick={() => handleFilter(category)}
+            >
+                {category}
+            </button>
+        ))}
+    </div>
+</div>
+
+{/* </div> */}
+
 
             <main className="product-list">
                 {filteredProducts.map((product) => (
@@ -254,7 +404,7 @@ const ItemsPage = () => {
                 </div>
             )}
 
-            <footer className="cart-footer">
+<footer className="cart-footer">
                 <div className="cart-container">
                     <img
                         src="https://i.pinimg.com/originals/e2/06/3e/e2063ef31174bff0e81d1bb641b5f3f3.png" 
@@ -264,10 +414,16 @@ const ItemsPage = () => {
                     <span className="cart-badge">{cart.reduce((total, item) => total + item.quantity, 0)}</span>
                 </div>
                 <button onClick={toggleOrderSummary} className="summary-button">Order Summary ></button>
-                <button className="place-order" style={{
-                    backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
-                    color: 'white',
-                }}>Play Order</button>
+                <button
+                    className="place-order"
+                    style={{
+                        backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
+                        color: 'white',
+                    }}
+                    onClick={handlePlayOrder}
+                >
+                    Play Order
+                </button>
             </footer>
 
             {showOrderSummary && (
@@ -307,10 +463,16 @@ const ItemsPage = () => {
                             </tbody>
                         </table>
                     </div>
-                        <button className="place-order cart" style={{
-                        backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
-                        color: 'white', // Optional for better contrast
-                        }}>Play Order</button>      
+                    <button
+                        className="place-order cart"
+                        style={{
+                            backgroundColor: cart.length === 0 ? 'grey' : 'darkgreen',
+                            color: 'white',
+                        }}
+                        onClick={handlePlayOrder}
+                    >
+                        Play Order
+                    </button>
                 </div>
             )}
             

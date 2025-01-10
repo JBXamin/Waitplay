@@ -1,0 +1,47 @@
+.waitplay-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #fff;
+    border: 10px solid white;
+    padding: 20px;
+    text-align: center;
+  }
+  
+  .waitplay-header {
+    font-size: 1.2rem;
+    color: #000;
+    margin-bottom: 10px;
+  }
+  
+  .waitplay-timer {
+    font-size: 2rem;
+    font-weight: bold;
+    color: red;
+    margin-bottom: 20px;
+  }
+  
+  .waitplay-message {
+    font-size: 1rem;
+    color: #444;
+    margin-bottom: 30px;
+    line-height: 1.5;
+  }
+  
+  .waitplay-button {
+    font-size: 1rem;
+    color: #fff;
+    background-color: #b974f9;
+    border: none;
+    border-radius: 20px;
+    padding: 10px 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .waitplay-button:hover {
+    background-color: #a75be7;
+  }
+  

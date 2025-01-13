@@ -156,7 +156,7 @@ const ItemsPage = () => {
         <div className="app-container">
             <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#fff', boxShadow: '0px 1px 5px rgba(0, 0, 0, 0.1)' }}>
     {/* Logo Section */}
-    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft:"4%" }}>
         <img
             src="https://via.placeholder.com/40"
             alt="Logo"
@@ -176,15 +176,17 @@ const ItemsPage = () => {
             fontSize: '14px',
             cursor: 'pointer',
             fontWeight: 'bold',
+            paddingRight: "4%",
+            marginRight:"3%",
         }}
     >
         Share or Join Cart
     </button>
 </header>
 
-<div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px' }}>
+<div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px', width:"100%" }}>
     {/* Search Bar */}
-    <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '10px', padding: '5px 10px', width: '75%' }}>
+    <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '10px', padding: '5px 10px', width: '75%', marginLeft:"2%" }}>
         <input
             type="text"
             placeholder="Search"
@@ -197,24 +199,30 @@ const ItemsPage = () => {
                 borderRadius: '5px',
             }}
         />
-        <span style={{ fontSize: '18px', color: '#888', cursor: 'pointer' }}>🔍</span>
+        <img 
+            src="https://s3-alpha-sig.figma.com/img/ae40/6128/f3012b96902d816d28e1503545a493ed?Expires=1737331200&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=XrLLwUzf5QcUUbG3O-NxCw4f~35asIgdZe~lqE~xF5u3N7Bw7ezAp43p5j2gMHuc0rTStuVYalBYNjBTH5jUi~D6EXXXhhMgdbybSKr29j4a1ij1PWErqa136o1WOkFpBwysyc0pvtfGAkNcxPUMBon8upK-lva~mtkpz37fHg~L8uCPDoWOjv2XK-ItCgVcOD4NR7YAiT2am8ScyGw6R5dLHsvMCcgKzS-kqlCK5jgds17MHB8Ro2TrWYGp5uAB56~2gle0g9g5u7jUUfsBFxNzNI~4IHPl0Zx~IObkmprORe8YLtN6Ze5MZQa2kV01~pdEx4zxn~JHUXO0jFkocg__" 
+            alt="Search Icon" 
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
+        />
     </div>
 
     {/* Call Waiter Button */}
     <button
         style={{
             background: '#8e44ad',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '20px',
+            // border: 'none',
+            position:'relative',
+            right:"2%",
+            padding: '10px 10px',
+            borderRadius: '10px',
             color: '#fff',
-            fontSize: '14px',
+            fontSize: '15px',
             cursor: 'pointer',
             fontWeight: 'bold',
             marginLeft: '15px',
+            whiteSpace: 'nowrap',
         }}
-    >
-        Call Waiter
+    >Call Waiter
     </button>
 </div>
 

@@ -242,10 +242,10 @@ body {
     border: none;
     cursor: pointer;
     position: relative;
-    left: -2.5%;
+    left: -40.5%;
   }
   
-  .cart-footer .place-order {
+  /* .cart-footer .place-order {
     background-color: #28a745;
     color: white;
     padding: 10px 20px;
@@ -255,11 +255,11 @@ body {
     cursor: pointer;
     position: relative;
     right: 7%;
-  }
+  } */
   
-  .cart-footer .place-order:hover {
+  /* .cart-footer .place-order:hover {
     background-color: #218838;
-  }
+  } */
   
   .quantity-control {
     display: flex;
@@ -769,10 +769,10 @@ body {
     right: 50%;
   }
   
-  .place-order.cart{
+  /* .cart{
     background-color: #28a745;
     color: white;
-    padding: 13px 20px;
+    padding: 13.5px 20px;
     border-radius: 25px;
     font-size: 14px;
     border: none;
@@ -781,8 +781,55 @@ body {
     right: 15%;
     bottom: 20px;
     width: auto; 
-  }
-  
+  } */
+  .place-order {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px; /* Adjust padding to ensure consistency */
+    border-radius: 25px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    position: fixed; /* Ensures consistent placement on all screens */
+    bottom: 20px; /* Distance from the bottom of the screen */
+    right: 15px; /* Distance from the right edge of the screen */
+    z-index: 1000; /* Ensures it stays above other elements */
+    width: auto; /* Adjust width automatically to content */
+    text-align: center;
+}
+
+.place-order.cart {
+    position: fixed;
+    bottom: 20px;
+    right: 15px;
+    background-color: #28a745; /* Consistent color for cart button */
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    z-index: 1000; /* Consistent stacking */
+}
+
+.place-order:hover {
+    background-color: #218838; /* Slightly darker green on hover */
+}
+
+.cart-footer .place-order {
+    position: fixed; /* Fixed position for consistency */
+    bottom: 20px; /* Aligned to the bottom */
+    right: 15px; /* Aligned to the right */
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    z-index: 1000; /* Ensure it's above other footer elements */
+}
+
   .close-kmore{
     background: red;
     border: none;

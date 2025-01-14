@@ -47,38 +47,43 @@ const LoginPage = () => {
             </button>
           </div>
         </div>
-        <div className="form-group otp-input">
-          <label>OTP</label>
-          <div className="otp-box">
-            <input
-              type="text"
-              maxLength={1}
-              value={otp[0] || ''}
-              onChange={(e) => setOtp((prev) => e.target.value + prev.slice(1))}
-            />
-            <input
-              type="text"
-              maxLength={1}
-              value={otp[1] || ''}
-              onChange={(e) => setOtp((prev) => prev.slice(0, 1) + e.target.value + prev.slice(2))}
-            />
-            <input
-              type="text"
-              maxLength={1}
-              value={otp[2] || ''}
-              onChange={(e) => setOtp((prev) => prev.slice(0, 2) + e.target.value + prev.slice(3))}
-            />
-            <input
-              type="text"
-              maxLength={1}
-              value={otp[3] || ''}
-              onChange={(e) => setOtp((prev) => prev.slice(0, 3) + e.target.value)}
-            />
-          </div>
+        <div className='form-group otp-input'>
+            <div className="otp-background">
+                <div className="otp-box">
+                    <label className='otp-text'>OTP</label>
+                    <input
+                    type="text"
+                    maxLength={1}
+                    value={otp[0] || ''}
+                    onChange={(e) => setOtp((prev) => e.target.value + prev.slice(1))}
+                    />
+                    <input
+                    type="text"
+                    maxLength={1}
+                    value={otp[1] || ''}
+                    onChange={(e) => setOtp((prev) => prev.slice(0, 1) + e.target.value + prev.slice(2))}
+                    />
+                    <input
+                    type="text"
+                    maxLength={1}
+                    value={otp[2] || ''}
+                    onChange={(e) => setOtp((prev) => prev.slice(0, 2) + e.target.value + prev.slice(3))}
+                    />
+                    <input
+                    type="text"
+                    maxLength={1}
+                    value={otp[3] || ''}
+                    onChange={(e) => setOtp((prev) => prev.slice(0, 3) + e.target.value)}
+                    />
+                    <div className='empty-box'></div>
+                </div>
+            </div>
         </div>
-        <button type="submit" className="submit-btn">
-          Launch Menu Card Now
-        </button>
+        <div className='exit-login'>
+            <button type="submit" className="submit-btn">
+            Launch Menu Card Now
+            </button>
+        </div>
       </form>
     </div>
   );

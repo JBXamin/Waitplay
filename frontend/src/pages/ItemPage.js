@@ -15,14 +15,13 @@ const ItemsPage = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isManualScroll, setIsManualScroll] = useState(false);
     const [activeFilters, setActiveFilters] = useState(['All']); // Default to "All" selected
+    const [searchQuery, setSearchQuery] = useState('');
     const bannerRef = useRef(null);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const type = queryParams.get('category') || 'all';
     const category = queryParams.get('category');
     const [dropdownOpen, setDropdownOpen] = useState(false);
-
-
     const navigate = useNavigate();
 
     const handlePlayOrder = () => {
@@ -57,6 +56,19 @@ const ItemsPage = () => {
         fetchProductsAndCategories();
     }, [type, category]);
     
+    useEffect(() => {
+        if (searchQuery.trim() !== '') {
+            axios
+                .get(`http://localhost:5000/api/search?q=${searchQuery}`)
+                .then((response) => setProducts(response.data))
+                .catch((error) => console.error('Error fetching search results:', error));
+        } else {
+            axios
+                .get(`http://localhost:5000/products?type=${type}`)
+                .then((response) => setProducts(response.data))
+                .catch((error) => console.error('Error fetching products:', error));
+        }
+    }, [searchQuery, type]);
 
     useEffect(() => {
         let interval;
@@ -190,6 +202,8 @@ const ItemsPage = () => {
         <input
             type="text"
             placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{
                 border: 'none',
                 outline: 'none',

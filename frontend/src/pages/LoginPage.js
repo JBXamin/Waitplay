@@ -1,19 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './LoginPage.css'; // Import the CSS file
 
 const LoginPage = () => {
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState(Array(4).fill(''));
+  const otpRefs = useRef([]);
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (name && mobile.length === 10 && otp.length === 4) {
+    if (name && mobile.length === 10 && otp.join('').length === 4) {
       navigate('/selection'); // Redirect to the Selection Page
     } else {
       alert('Please fill in all fields correctly.');
+    }
+  };
+
+  const handleOtpChange = (value, index) => {
+    if (/^[0-9]?$/.test(value)) { // Only allow numeric input
+      const newOtp = [...otp];
+      newOtp[index] = value;
+      setOtp(newOtp);
+      if (value && index < 3) {
+        otpRefs.current[index + 1].focus(); // Move focus to next box
+      }
+    }
+  };
+
+  const handleKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs.current[index - 1].focus(); // Move focus to previous box on backspace
     }
   };
 
@@ -51,31 +69,17 @@ const LoginPage = () => {
             <div className="otp-background">
                 <div className="otp-box">
                     <label className='otp-text'>OTP</label>
-                    <input
-                    type="text"
-                    maxLength={1}
-                    value={otp[0] || ''}
-                    onChange={(e) => setOtp((prev) => e.target.value + prev.slice(1))}
-                    />
-                    <input
-                    type="text"
-                    maxLength={1}
-                    value={otp[1] || ''}
-                    onChange={(e) => setOtp((prev) => prev.slice(0, 1) + e.target.value + prev.slice(2))}
-                    />
-                    <input
-                    type="text"
-                    maxLength={1}
-                    value={otp[2] || ''}
-                    onChange={(e) => setOtp((prev) => prev.slice(0, 2) + e.target.value + prev.slice(3))}
-                    />
-                    <input
-                    type="text"
-                    maxLength={1}
-                    value={otp[3] || ''}
-                    onChange={(e) => setOtp((prev) => prev.slice(0, 3) + e.target.value)}
-                    />
-                    <div className='empty-box'></div>
+                    {[0, 1, 2, 3].map((_, index) => (
+                      <input
+                        key={index}
+                        type="text"
+                        maxLength={1}
+                        value={otp[index]}
+                        ref={(el) => (otpRefs.current[index] = el)}
+                        onChange={(e) => handleOtpChange(e.target.value, index)}
+                        onKeyDown={(e) => handleKeyDown(e, index)}
+                      />
+                    ))}
                 </div>
             </div>
         </div>

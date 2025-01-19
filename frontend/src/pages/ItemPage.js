@@ -15,7 +15,11 @@ const ItemsPage = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isManualScroll, setIsManualScroll] = useState(false);
     const [activeFilters, setActiveFilters] = useState(['All']); // Default to "All" selected
+    const [isFocused, setIsFocused] = useState(false); // Track input focus
+    const [isTyping, setIsTyping] = useState(false); // Track user typing
     const [searchQuery, setSearchQuery] = useState('');
+    const [currentPlaceholder, setCurrentPlaceholder] = useState('Search');
+    const [index, setIndex] = useState(0);
     const bannerRef = useRef(null);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
@@ -23,7 +27,6 @@ const ItemsPage = () => {
     const category = queryParams.get('category');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const navigate = useNavigate();
-
     const handlePlayOrder = () => {
         if (cart.length > 0) {
             navigate('/waitplay'); // Adjust the route path if needed
@@ -55,7 +58,7 @@ const ItemsPage = () => {
     
         fetchProductsAndCategories();
     }, [type, category]);
-    
+
     useEffect(() => {
         if (searchQuery.trim() !== '') {
             axios
@@ -86,11 +89,51 @@ const ItemsPage = () => {
         return () => clearInterval(interval);
     }, [isManualScroll]);
 
+    useEffect(() => {
+        let interval;
+    
+        if (!isFocused && !isTyping && searchQuery.trim() === '') {
+            interval = setInterval(() => {
+                const randomIndex = Math.floor(Math.random() * products.length);
+                const randomProduct = products[randomIndex]?.title || '...';
+                setCurrentPlaceholder(`Search ${randomProduct}`);
+            }, 5000); // Rotate every 5 seconds
+        }
+    
+        return () => clearInterval(interval); // Cleanup on unmount
+    }, [isFocused, isTyping, searchQuery, products]);
+    
+
+    useEffect(() => {
+        // Update the placeholder text every 5 seconds
+        const interval = setInterval(() => {
+          const nextIndex = (index + 1) % products.length; // Loop through products
+          setIndex(nextIndex);
+          setCurrentPlaceholder(`Search ${products[nextIndex]?.title || '...'}`);
+        }, 5000); // Change every 5 seconds
+      
+        return () => clearInterval(interval); // Cleanup on unmount
+      }, [index, products]);  
+
     const handleManualScroll = () => {
         setIsManualScroll(true);
         setTimeout(() => setIsManualScroll(false), 10000);
     };
 
+    const handleFocus = () => setIsFocused(true);
+
+    const handleBlur = () => {
+        setIsFocused(false);
+        if (searchQuery.trim() === '') {
+            setIsTyping(false); // Reset typing state if input is empty
+        }
+    };
+
+    const handleChange = (e) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        setIsTyping(value.trim() !== ''); // If input is not empty, set isTyping to true
+    };
     const handleQuantityChange = (productId, type, delta) => {
         setQuantityState((prevState) => {
             const key = `${productId}-${type}`;
@@ -198,12 +241,14 @@ const ItemsPage = () => {
 
 <div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px', width:"100%" }}>
     {/* Search Bar */}
-    <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '10px', padding: '5px 10px', width: '75%', marginLeft:"2%" }}>
+    <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: '#fff', borderRadius: '10px', padding: '5px 10px', width: '75%', marginLeft: "2%" }}>
         <input
             type="text"
-            placeholder="Search"
+            placeholder={isFocused || isTyping ? '' : currentPlaceholder} // Show animation or user input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={handleFocus} // Stop animation when focused
+            onBlur={handleBlur} // Resume animation if empty on blur
+            onChange={handleChange} // Handle typing
             style={{
                 border: 'none',
                 outline: 'none',
@@ -213,12 +258,14 @@ const ItemsPage = () => {
                 borderRadius: '5px',
             }}
         />
-        <img 
-            src="https://s3-alpha-sig.figma.com/img/ae40/6128/f3012b96902d816d28e1503545a493ed?Expires=1737331200&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=XrLLwUzf5QcUUbG3O-NxCw4f~35asIgdZe~lqE~xF5u3N7Bw7ezAp43p5j2gMHuc0rTStuVYalBYNjBTH5jUi~D6EXXXhhMgdbybSKr29j4a1ij1PWErqa136o1WOkFpBwysyc0pvtfGAkNcxPUMBon8upK-lva~mtkpz37fHg~L8uCPDoWOjv2XK-ItCgVcOD4NR7YAiT2am8ScyGw6R5dLHsvMCcgKzS-kqlCK5jgds17MHB8Ro2TrWYGp5uAB56~2gle0g9g5u7jUUfsBFxNzNI~4IHPl0Zx~IObkmprORe8YLtN6Ze5MZQa2kV01~pdEx4zxn~JHUXO0jFkocg__" 
-            alt="Search Icon" 
-            style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
+        <img
+            src="https://s3-alpha-sig.figma.com/img/ae40/6128/f3012b96902d816d28e1503545a493ed?Expires=1737331200&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=XrLLwUzf5QcUUbG3O-NxCw4f~35asIgdZe~lqE~xF5u3N7Bw7ezAp43p5j2gMHuc0rTStuVYalBYNjBTH5jUi~D6EXXXhhMgdbybSKr29j4a1ij1PWErqa136o1WOkFpBwysyc0pvtfGAkNcxPUMBon8upK-lva~mtkpz37fHg~L8uCPDoWOjv2XK-ItCgVcOD4NR7YAiT2am8ScyGw6R5dLHsvMCcgKzS-kqlCK5jgds17MHB8Ro2TrWYGp5uAB56~2gle0g9g5u7jUUfsBFxNzNI~4IHPl0Zx~IObkmprORe8YLtN6Ze5MZQa2kV01~pdEx4zxn~JHUXO0jFkocg__"
+            alt="Search Icon"
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
         />
     </div>
+
+
 
     {/* Call Waiter Button */}
     <button
@@ -465,7 +512,7 @@ const ItemsPage = () => {
                             <div className="summary-text">Order Summary </div>
                             <button onClick={toggleOrderSummary} className="close-summary">X</button>
                         </div>
-                        <table className="order-list scrollable">
+                        <table className="order-list">
                             <thead>
                                 <tr>
                                     <th>Item</th>
@@ -478,7 +525,11 @@ const ItemsPage = () => {
                                     <tr key={`${item._id}-${item.type}`} className="order-item">
                                         <td>{index + 1}</td>
                                         <td>{item.title} ({item.type})</td>
-                                        <td>{item.quantity}</td>
+                                        <td className="quantity-controls">
+                                            <button onClick={() => handleQuantityChange(item._id, item.type, -1)} className = "sPlus">-</button>
+                                            <span>{item.quantity}</span>
+                                            <button onClick={() => handleQuantityChange(item._id, item.type, 1)} className = "sMinus">+</button>
+                                        </td>
                                         <td>₹{item.price * item.quantity}</td>
                                     </tr>
                                 ))}

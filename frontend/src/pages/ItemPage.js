@@ -1,9 +1,8 @@
-//itempage.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import './ItemPage.css';
 
 const ItemsPage = () => {
@@ -27,6 +26,14 @@ const ItemsPage = () => {
     const category = queryParams.get('category');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const navigate = useNavigate();
+    const [showModal, setShowModal] = useState(false);
+    const [cartId, setCartId] = useState('');
+    const [qrCode, setQrCode] = useState('');
+    const [joinCartId, setJoinCartId] = useState('');
+    const [cartData, setCartData] = useState(null);
+
+    const socket = io('http://localhost:5000');
+
     const handlePlayOrder = () => {
         if (cart.length > 0) {
             navigate('/waitplay'); // Adjust the route path if needed
@@ -114,7 +121,27 @@ const ItemsPage = () => {
       
         return () => clearInterval(interval); // Cleanup on unmount
       }, [index, products]);  
-
+    
+      useEffect(() => {
+        if (joinCartId) {
+          // Join the cart room
+          socket.emit('join-cart', joinCartId);
+    
+          // Listen for cart updates
+          socket.on('cart-updated', (updatedCart) => {
+            if (updatedCart.cartId === joinCartId) {
+              setCartData(updatedCart);
+              setCart(updatedCart.items);
+            }
+          });
+    
+          // Cleanup on component unmount
+          return () => {
+            socket.off('cart-updated');
+          };
+        }
+      }, [joinCartId, socket]);
+    
     const handleManualScroll = () => {
         setIsManualScroll(true);
         setTimeout(() => setIsManualScroll(false), 10000);
@@ -128,6 +155,29 @@ const ItemsPage = () => {
             setIsTyping(false); // Reset typing state if input is empty
         }
     };
+
+    const handleShareCart = async () => {
+        try {
+          const userId = "user123"; // Replace with dynamic user ID from your app
+          const response = await axios.post('http://localhost:5000/create-cart', { userId });
+          setCartId(response.data.cartId);
+          setQrCode(response.data.qrCode); // Backend provides the QR code
+        } catch (error) {
+          console.error('Error creating cart:', error);
+          alert('Failed to create cart. Please try again.');
+        }
+      };
+
+      const handleJoinCart = async () => {
+        try {
+          const userId = "user123"; // Replace with dynamic user ID from your app
+          await axios.post('http://localhost:5000/join-cart', { cartId: joinCartId, userId });
+          alert(`Successfully joined cart with ID: ${joinCartId}`);
+        } catch (error) {
+          console.error('Error joining cart:', error);
+          alert('Failed to join cart. Please try again.');
+        }
+      };
 
     const handleChange = (e) => {
         const value = e.target.value;
@@ -167,6 +217,16 @@ const ItemsPage = () => {
                     }
                 });
             }
+
+            console.log(`Cart ID: ${joinCartId}`);
+        console.log(`Requesting URL: http://localhost:5000/cart/${joinCartId}/add-item`);
+
+            // Emit cart-updated to server
+            axios.post(`http://localhost:5000/cart/${cartId}/add-item`, {
+                itemName: productId, // Use productId or a better identifier
+                quantity: newQuantity,
+                addedBy: 'user123', // Replace with the current user ID
+            });
 
             return { ...prevState, [key]: newQuantity };
         });
@@ -220,23 +280,82 @@ const ItemsPage = () => {
         <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>Logo</span>
     </div>
 
-    {/* Share or Join Cart Button */}
-    <button
-        style={{
-            background: 'linear-gradient(to right, #f54ea2, #ff7676)',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '20px',
-            color: '#fff',
-            fontSize: '14px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            paddingRight: "4%",
-            marginRight:"3%",
-        }}
-    >
-        Share or Join Cart
-    </button>
+    <div>
+            {/* Main Button */}
+            <button
+                style={{
+                    background: 'linear-gradient(to right, #f54ea2, #ff7676)',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '20px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    paddingRight: '4%',
+                    marginRight: '3%',
+                    zIndex:-1,
+                }}
+                onClick={() => setShowModal(true)}
+            >
+                Share or Join Cart
+            </button>
+
+            {/* Modal for Share/Join Actions */}
+            {showModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3 className="modal-title">Share or Join a Cart</h3>
+                        <div className="modal-actions">
+                        <button className="btn btn-share" onClick={handleShareCart}>
+                            Share Cart
+                        </button>
+                        <button
+                            className="btn btn-join-info"
+                            onClick={() => alert('Enter Cart ID to Join')}
+                        >
+                            Join Cart
+                        </button>
+                        </div>
+
+                        {cartId && (
+                        <div className="cart-info">
+                            <h4>Cart ID: {cartId}</h4>
+                            <img src={qrCode} alt="QR Code" className="qr-code" />
+                        </div>
+                        )}
+
+                        <div className="join-cart-input">
+                        <input
+                            type="text"
+                            placeholder="Enter Cart ID to Join"
+                            value={joinCartId}
+                            onChange={(e) => setJoinCartId(e.target.value)}
+                            className="input"
+                        />
+                        <button className="btn btn-join" onClick={handleJoinCart}>
+                            Join
+                        </button>
+                        </div>
+
+                        {cartData && (
+                        <div>
+                            <h4>Cart Data:</h4>
+                            <ul>
+                            {cartData.items.map((item, index) => (
+                                <li key={index}>{item.itemName} - {item.quantity}</li>
+                            ))}
+                            </ul>
+                        </div>
+                        )}
+
+                        <button className="btn btn-close" onClick={() => setShowModal(false)}>
+                        Close
+                        </button>
+                    </div>
+                    </div>
+                )}
+        </div>
 </header>
 
 <div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px', width:"100%" }}>

@@ -2,12 +2,18 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
+const http = require('http'); // Required for integrating Socket.IO
+const { Server } = require('socket.io'); // Socket.IO integration
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+const server = http.createServer(app); // Create HTTP server for Socket.IO
+const io = new Server(server); // Initialize Socket.IO
 
 mongoose
 .connect("mongodb+srv://Waitplay:Waitplay@cluster0.u4tx7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
@@ -29,6 +35,47 @@ const productSchema = new mongoose.Schema({
 });
 
 const Product = mongoose.model('Product', productSchema);
+
+//cart schema
+const cartSchema = new mongoose.Schema({
+  cartId: { type: String, unique: true, required: true }, // Unique identifier for the cart
+  createdBy: { type: String, required: true }, // User who created the cart
+  users: [{ type: String }], // List of users who joined the cart
+  items: [
+    {
+      itemName: String,
+      quantity: Number,
+      addedBy: String,
+    },
+  ],
+  createdAt: { type: Date, default: Date.now },
+});
+
+const Cart = mongoose.model('Cart', cartSchema);
+
+// Listen for Socket.IO connections
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // Join a specific cart room
+  socket.on('join-cart', (cartId) => {
+    socket.join(cartId);
+    console.log(`User joined cart room: ${cartId}`);
+  });
+
+  socket.on('cart-updated', (updatedCart) => {
+    if (updatedCart.cartId === joinCartId) {
+      setCartData(updatedCart); // Sync cart data
+      setCart(updatedCart.items); // Sync items in the local cart
+    }
+  });
+  
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 
 // Fetch products with optional filter by type and category
 app.get('/products', async (req, res) => {
@@ -68,6 +115,74 @@ app.get('/api/search', async (req, res) => {
     res.json(results);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching search results', error: error.message });
+  }
+});
+
+// Create a new cart and generate QR code
+app.post('/create-cart', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const cartId = crypto.randomBytes(4).toString('hex'); // Generate a unique cart ID
+
+    const newCart = new Cart({
+      cartId,
+      createdBy: userId,
+      users: [userId], // Add the creator as the first user
+    });
+
+    await newCart.save();
+
+    const qrCode = await QRCode.toDataURL(cartId);
+    res.status(201).json({ cartId, qrCode });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating cart', error: error.message });
+  }
+});
+
+// Join an existing cart
+app.post('/join-cart', async (req, res) => {
+  try {
+    const { cartId, userId } = req.body;
+
+    const cart = await Cart.findOne({ cartId });
+    if (!cart) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+
+    if (!cart.users.includes(userId)) {
+      cart.users.push(userId);
+      await cart.save();
+    }
+
+    // Notify other users in the cart room
+    io.to(cartId).emit('cart-updated', cart);
+
+    res.status(200).json({ message: 'Successfully joined the cart', cartId });
+  } catch (error) {
+    res.status(500).json({ message: 'Error joining cart', error: error.message });
+  }
+});
+
+app.post('/cart/:cartId/add-item', (req, res) => {
+  console.log('Request received with cartId:', req.params.cartId);
+  console.log('Request body:', req.body);
+  res.status(200).json({ message: 'Request successful' });
+});
+
+
+// Retrieve cart details
+app.get('/cart/:cartId', async (req, res) => {
+  try {
+    const { cartId } = req.params;
+
+    const cart = await Cart.findOne({ cartId });
+    if (!cart) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+
+    res.status(200).json(cart);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching cart', error: error.message });
   }
 });
 

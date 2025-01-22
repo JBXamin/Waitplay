@@ -154,12 +154,11 @@ body {
   max-width: 500px;
   width: 100%;
   position: relative;
-  animation: slide-up 0.3s ease-in-out;
 }
 
-@keyframes slide-up {
-  0% { transform: translateY(100%); }
-  100% { transform: translateY(0); }
+.order-summary.slide-up{
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .back-arrow {
@@ -261,27 +260,37 @@ body {
   background-color: #218838;
 } */
 
-.quantity-control {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background-color: #f2f2f2;
-  border-radius: 25px;
-  padding: 5px 10px;
+.quantity-controls {
+  display: flex; /* Enables horizontal alignment */
+  align-items: center; /* Centers items vertically */
+  justify-content: center; /* Centers items horizontally if needed */
+  gap: 5px; /* Adds spacing between buttons and quantity */
 }
 
-.quantity-control button {
-  background-color: transparent;
-  border: none;
-  font-size: 16px;
+.quantity-controls button {
+  width: 30px; /* Width of buttons */
+  height: 30px; /* Height of buttons */
+  text-align: center;
+  border: 1px solid #ccc; /* Add border for buttons */
+  background-color: #444; /* Match the gray theme */
+  color: white; /* Button text color */
+  font-size: 16px; /* Font size for buttons */
+  border-radius: 5px; /* Rounded corners for buttons */
   cursor: pointer;
-  color: #333;
 }
 
-.quantity-control span {
-  font-size: 14px;
-  font-weight: bold;
-  color: #333;
+.quantity-controls span {
+  width: 40px; /* Adjust width for the quantity display */
+  text-align: center;
+  display: inline-block; /* Ensures alignment with buttons */
+  font-size: 16px; /* Match the font size */
+  color: white; /* Match text color */
+}
+
+
+.sPlus, .sMinus{
+  background-color: #333;
+  color: white;
 }
 
 .order-summary-popup {
@@ -296,10 +305,11 @@ body {
   overflow: hidden;
 }
 
-.order-list.scrollable {
-  max-height: 40vh;
-  overflow-y: auto;
-  padding-right: 10px;
+.order-list {
+  table-layout: fixed; /* Ensure columns have fixed widths */
+  width: 100%; /* Full width for the table */
+  border-collapse: collapse; /* Remove gaps between table cells */
+  border-spacing: 0;
 }
 
 .order-item {
@@ -654,11 +664,17 @@ body {
   font-weight: bold;
 }
 
+.order-list tr {
+  margin: 0;
+  padding: 0;
+}
+
 .order-summary-container {
   position: fixed;
   bottom: 0;
   left: 0;
-  width: 100%;
+  width: 100vw;
+  max-width: 100%;
   height: 40%;
   background-color: #000;
   color: white;
@@ -666,6 +682,7 @@ body {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  overflow-x: auto;
 }
 
 .order-summary {
@@ -695,14 +712,20 @@ body {
 }
 
 .order-list th {
-  color: gray;
   padding: 10px;
+  text-align: center; /* Center-align content */
+  color: white; /* Text color */
+  overflow: hidden; /* Prevent content overflow */
+  text-overflow: ellipsis; /* Add ellipsis for overflowing text */
+  white-space: nowrap; /* Prevent wrapping of text */
 }
 
 .order-list td {
   padding: 10px;
-  text-align: center;
-  color: lightgray; /* Light gray for table content */
+  text-align: center; /* Center-align content */
+  color: white; /* Text color */
+  overflow: hidden; /* Prevent content overflow */
+  text-overflow: ellipsis; /* Add ellipsis for overflowing text */ /* Prevent wrapping of text */
 }
 
 .close-summary {
@@ -713,47 +736,38 @@ body {
   cursor: pointer;
 }
 
+.order-list tr {
+  width: 100%; /* Ensure rows stretch fully across the table */
+}
+
 .order-list th:nth-child(1) {
-    text-align: left;
-    width: 40%; /* Adjust width for Item column */
-    position: relative;
-    left: 15%;
+  width: 50%; /* Fixed width for the Item column */
+  text-align: left; /* Align text to the left for better readability */
 }
 
 .order-list th:nth-child(2){
-    text-align: center;
-    width: 20%; /* Adjust width for Quantity column */
-    position: relative;
-    right: 10%;
+  width: 25%; /* Fixed width for the Quantity column */
 }
 
 .order-list th:nth-child(3){
-    text-align: right;
-    width: 20%; /* Adjust width for Price column */
-    position: relative;
-    right: 7%;
+  width: 25%; /* Fixed width for the Price column */
+  text-align: right; /* Align prices to the right */
 }
 
-.order-list td:nth-child(1) {
-  text-align: left;
-  width: 40%; /* Adjust width for Serial number column */
-  position: relative;
-  left: 2%;
+.order-list td:nth-child(2) {
+  width: 1000%; /* Fixed width for the Item column */
+  text-align: left; /* Align text to the left for better readability */
 }
 
 .order-list td:nth-child(3){
-  text-align: center;
-  width: 20%; /* Adjust width for Quantity column */
-  position: relative;
-  left: 35%;
+  width: 25%; /* Fixed width for the Quantity column */
+  margin-left: px;
 }
 
 
 .order-list td:nth-child(4){
-  text-align: right;
-  width: 20%; /* Adjust width for Price column */
-  position: relative;
-  left: 65%;
+  width: 25%; /* Fixed width for the Price column */
+  text-align: right; /* Align prices to the right */
 }
 
 .summary-text{
@@ -763,6 +777,8 @@ body {
   display: inline-block;
   padding-bottom: 5px;
 }
+
+
 
 .new-cart{
   position: relative;
@@ -840,4 +856,128 @@ body {
   position: absolute;
   right: 0.1%;
   top: 0%;
+}
+
+.animated-placeholder {
+  position: absolute;
+  left: 10px; /* Align with input padding */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #ccc;
+  pointer-events: none; /* Make it non-interactive */
+  white-space: nowrap;
+  animation: slide-in-out 5s infinite ease-in-out;
+}
+
+@keyframes slide-in-out {
+  0% {
+    opacity: 0;
+    transform: translateY(20px); /* Start below */
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0); /* Slide in */
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0); /* Stay visible */
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px); /* Slide out */
+  }
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Dims the background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Modal Content */
+.modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-share {
+  background: #4caf50;
+  color: #fff;
+}
+
+.btn-join-info {
+  background: #2196f3;
+  color: #fff;
+}
+
+.btn-join {
+  background: #ff5722;
+  color: #fff;
+}
+
+.btn-close {
+  background: #f44336;
+  color: #fff;
+  margin-top: 20px;
+}
+
+.btn:hover {
+  opacity: 0.8;
+}
+
+/* Input Field */
+.input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: calc(100% - 30px); /* Full width minus padding */
+  margin-bottom: 10px;
+}
+
+/* QR Code Styling */
+.qr-code {
+  margin-top: 10px;
+  width: 150px;
+  height: 150px;
+}
+
+.cart-info {
+  margin-top: 20px;
+  text-align: center;
 }

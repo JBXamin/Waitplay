@@ -31,8 +31,12 @@ const ItemsPage = () => {
     const [qrCode, setQrCode] = useState('');
     const [joinCartId, setJoinCartId] = useState('');
     const [cartData, setCartData] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const socket = io('http://localhost:5000');
+    const socket = io('http://localhost:5000', {
+        withCredentials: true, // Include credentials (if needed)
+      });
 
     const handlePlayOrder = () => {
         if (cart.length > 0) {
@@ -122,25 +126,43 @@ const ItemsPage = () => {
         return () => clearInterval(interval); // Cleanup on unmount
       }, [index, products]);  
     
-      useEffect(() => {
-        if (joinCartId) {
-          // Join the cart room
-          socket.emit('join-cart', joinCartId);
+    //   useEffect(() => {
+    //     if (joinCartId) {
+    //       // Join the cart room
+    //       socket.emit('join-cart', joinCartId);
+      
+    //       // Listen for cart updates
+    //       socket.on('cart-updated', (updatedCart) => {
+    //         if (updatedCart.cartId === joinCartId) {
+    //           setCartData(updatedCart);
+    //           setCart(updatedCart.items);
+    //         }
+    //       });
+      
+    //       // Cleanup on component unmount
+    //       return () => {
+    //         socket.off('cart-updated');
+    //       };
+    //     }
+    //   }, [joinCartId, socket]);
+
+    // React client-side code
+    useEffect(() => {
+        const socket = io('http://localhost:5000'); // Connect to the Socket.IO server
     
-          // Listen for cart updates
-          socket.on('cart-updated', (updatedCart) => {
-            if (updatedCart.cartId === joinCartId) {
-              setCartData(updatedCart);
-              setCart(updatedCart.items);
-            }
-          });
+        // Join the cart room
+        socket.emit('join-cart', { cartId: 'your-cart-id' });
     
-          // Cleanup on component unmount
-          return () => {
-            socket.off('cart-updated');
-          };
-        }
-      }, [joinCartId, socket]);
+        // Listen for cart updates
+        socket.on('cart-updated', (updatedCart) => {
+        setCart(updatedCart.items); // Update the local cart state
+        });
+    
+        // Cleanup on component unmount
+        return () => {
+        socket.disconnect();
+        };
+    }, []);
     
     const handleManualScroll = () => {
         setIsManualScroll(true);
@@ -157,25 +179,35 @@ const ItemsPage = () => {
     };
 
     const handleShareCart = async () => {
+        setIsLoading(true);
+        setError('');
+      
         try {
           const userId = "user123"; // Replace with dynamic user ID from your app
           const response = await axios.post('http://localhost:5000/create-cart', { userId });
           setCartId(response.data.cartId);
-          setQrCode(response.data.qrCode); // Backend provides the QR code
+          setQrCode(response.data.qrCode);
         } catch (error) {
           console.error('Error creating cart:', error);
-          alert('Failed to create cart. Please try again.');
+          setError('Failed to create cart. Please try again.');
+        } finally {
+          setIsLoading(false);
         }
       };
 
       const handleJoinCart = async () => {
+        setIsLoading(true);
+        setError('');
+      
         try {
           const userId = "user123"; // Replace with dynamic user ID from your app
           await axios.post('http://localhost:5000/join-cart', { cartId: joinCartId, userId });
           alert(`Successfully joined cart with ID: ${joinCartId}`);
         } catch (error) {
           console.error('Error joining cart:', error);
-          alert('Failed to join cart. Please try again.');
+          setError('Failed to join cart. Please try again.');
+        } finally {
+          setIsLoading(false);
         }
       };
 
@@ -184,53 +216,56 @@ const ItemsPage = () => {
         setSearchQuery(value);
         setIsTyping(value.trim() !== ''); // If input is not empty, set isTyping to true
     };
+
     const handleQuantityChange = (productId, type, delta) => {
         setQuantityState((prevState) => {
-            const key = `${productId}-${type}`;
-            const newQuantity = Math.max((prevState[key] || 0) + delta, 0);
-
-            if (newQuantity === 0) {
-                setCart((prevCart) => prevCart.filter(item => !(item._id === productId && item.type === type)));
-            } else {
-                setCart((prevCart) => {
-                    const existingProduct = prevCart.find(
-                        (item) => item._id === productId && item.type === type
-                    );
-                    if (existingProduct) {
-                        return prevCart.map((item) =>
-                            item._id === productId && item.type === type
-                                ? { ...item, quantity: newQuantity }
-                                : item
-                        );
-                    } else {
-                        const product = products.find((prod) => prod._id === productId);
-                        return [
-                            ...prevCart,
-                            {
-                                _id: productId,
-                                title: product.title,
-                                type,
-                                price: type === 'Half' ? product.halfPrice : product.fullPrice,
-                                quantity: newQuantity,
-                            },
-                        ];
-                    }
-                });
-            }
-
-            console.log(`Cart ID: ${joinCartId}`);
-        console.log(`Requesting URL: http://localhost:5000/cart/${joinCartId}/add-item`);
-
-            // Emit cart-updated to server
-            axios.post(`http://localhost:5000/cart/${cartId}/add-item`, {
-                itemName: productId, // Use productId or a better identifier
-                quantity: newQuantity,
-                addedBy: 'user123', // Replace with the current user ID
+          const key = `${productId}-${type}`;
+          const newQuantity = Math.max((prevState[key] || 0) + delta, 0);
+      
+          if (newQuantity === 0) {
+            setCart((prevCart) => prevCart.filter(item => !(item._id === productId && item.type === type)));
+          } else {
+            setCart((prevCart) => {
+              const existingProduct = prevCart.find(
+                (item) => item._id === productId && item.type === type
+              );
+              if (existingProduct) {
+                return prevCart.map((item) =>
+                  item._id === productId && item.type === type
+                    ? { ...item, quantity: newQuantity }
+                    : item
+                );
+              } else {
+                const product = products.find((prod) => prod._id === productId);
+                return [
+                  ...prevCart,
+                  {
+                    _id: productId,
+                    title: product.title,
+                    type,
+                    price: type === 'Half' ? product.halfPrice : product.fullPrice,
+                    quantity: newQuantity,
+                  },
+                ];
+              }
             });
-
-            return { ...prevState, [key]: newQuantity };
+          }
+      
+          // Send the updated cart to the server
+          if (joinCartId) {
+            socket.emit('update-cart', {
+              cartId: joinCartId,
+              item: {
+                itemName: productId,
+                quantity: newQuantity,
+                addedBy: 'user123', // Replace with dynamic user ID
+              },
+            });
+          }
+      
+          return { ...prevState, [key]: newQuantity };
         });
-    };
+      };
 
     const toggleOrderSummary = () => {
         setShowOrderSummary(!showOrderSummary);

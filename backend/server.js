@@ -53,6 +53,14 @@ const cartSchema = new mongoose.Schema({
 
 const Cart = mongoose.model('Cart', cartSchema);
 
+app.use((req, res, next) => {
+  console.log(`Received ${req.method} request at ${req.url}`);
+  console.log('Request Params:', req.params);
+  console.log('Request Body:', req.body);
+  next();
+});
+
+
 // Listen for Socket.IO connections
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
@@ -67,6 +75,30 @@ io.on('connection', (socket) => {
     if (updatedCart.cartId === joinCartId) {
       setCartData(updatedCart); // Sync cart data
       setCart(updatedCart.items); // Sync items in the local cart
+    }
+  });
+
+  socket.on('update-cart', async (data) => {
+    const { cartId, item } = data;
+
+    try {
+      const cart = await Cart.findOne({ cartId });
+      if (!cart) {
+        console.error('Cart not found:', cartId);
+        return;
+      }
+
+      const existingItem = cart.items.find((i) => i.itemName === item.itemName);
+      if (existingItem) {
+        existingItem.quantity = item.quantity;
+      } else {
+        cart.items.push(item);
+      }
+
+      await cart.save();
+      io.to(cartId).emit('cart-updated', cart); // Broadcast the updated cart
+    } catch (error) {
+      console.error('Error updating cart:', error);
     }
   });
   
@@ -140,6 +172,7 @@ app.post('/create-cart', async (req, res) => {
 });
 
 // Join an existing cart
+// In the /join-cart API endpoint
 app.post('/join-cart', async (req, res) => {
   try {
     const { cartId, userId } = req.body;
@@ -157,17 +190,48 @@ app.post('/join-cart', async (req, res) => {
     // Notify other users in the cart room
     io.to(cartId).emit('cart-updated', cart);
 
+    // Add the user to the Socket.IO room
+    io.emit('join-cart', { cartId, userId });
+
     res.status(200).json({ message: 'Successfully joined the cart', cartId });
   } catch (error) {
     res.status(500).json({ message: 'Error joining cart', error: error.message });
   }
 });
 
-app.post('/cart/:cartId/add-item', (req, res) => {
-  console.log('Request received with cartId:', req.params.cartId);
-  console.log('Request body:', req.body);
-  res.status(200).json({ message: 'Request successful' });
+app.post('/cart/:cartId/add-item', async (req, res) => {
+  const { cartId } = req.params;
+  if (!cartId) {
+      console.error('Cart ID is missing in the request.');
+      return res.status(400).json({ message: 'Cart ID is required.' });
+  }
+
+  try {
+      const { itemName, quantity, addedBy } = req.body;
+
+      const cart = await Cart.findOne({ cartId });
+      if (!cart) {
+          console.error(`Cart not found for ID: ${cartId}`);
+          return res.status(404).json({ message: 'Cart not found' });
+      }
+
+      // Process the cart update
+      const existingItem = cart.items.find((item) => item.itemName === itemName);
+      if (existingItem) {
+          existingItem.quantity += quantity;
+      } else {
+          cart.items.push({ itemName, quantity, addedBy });
+      }
+
+      await cart.save();
+      io.to(cartId).emit('cart-updated', cart); // Notify other users in the cart
+      res.status(200).json({ message: 'Item added to cart', cart });
+  } catch (error) {
+      console.error('Error adding item to cart:', error.message);
+      res.status(500).json({ message: 'Error adding item to cart', error: error.message });
+  }
 });
+
 
 
 // Retrieve cart details

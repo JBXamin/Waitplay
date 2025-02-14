@@ -39,25 +39,34 @@ const ItemsPage = () => {
             alert('Your cart is empty. Add items to play the order.');
         }
     };
-
     useEffect(() => {
         if (!cartID) return;
-
+    
         socket.emit("join-cart", cartID);
-        console.log(cartItems);
+        console.log(cart); // Log the cart to debug
+    
         // Listen for updates
         socket.on("update-cart", (data) => {
+            console.log("Received cart update event:", data);
+    
             if (data.action === "add") {
-                setCartItems((prev) => [...prev, data.item]); // Add new item
-            } else if (data.action === "remove") {
-                setCartItems((prev) => prev.filter(item => item.id !== data.itemID)); // Remove item
+                console.log("aaaaaa" ,data.items);
+                setCart(data.items); // Add new item
+            // } else if (data.action === "remove") {
+            //     setCart((prev) => prev.filter(item => item.id !== data.itemID)); // Remove item
+            }
+    
+            if (Array.isArray(data.items)) {
+                setCart(data.items); // Update with the correct array
+            } else {
+                console.error("Received data is not an array:", data.items);
             }
         });
-
+    
         return () => {
             socket.off("update-cart"); // Cleanup
         };
-    }, [cartID,items]);
+    }, [cartID, cart]);    
 
     useEffect(() => {
         axios
@@ -140,15 +149,36 @@ const ItemsPage = () => {
       }, [index, products]); 
       
       useEffect(() => {
-        socket.on("cartUpdated", (updatedItems) => {
-            console.log(updatedItems);
-            setItems(updatedItems);
-        });
-
-        return () => {
-            socket.off("cartUpdated");
+        const handleCartUpdate = (updatedItems) => {
+            console.log("Received cart update from WebSocket:", updatedItems);
+    
+            if (!Array.isArray(updatedItems.items)) {
+                console.log("updatedItems type: ", typeof updatedItems);
+                console.error("Expected an array but received:", updatedItems);
+                return;
+            }
+    
+            // Remove duplicate items before updating state
+            const uniqueItems = [...new Set(updatedItems.items.map(item => JSON.stringify(item)))]
+                .map(str => JSON.parse(str));
+    
+            console.log("Filtered items:", uniqueItems);
+            setCartItems(uniqueItems);
         };
-    }, [cartID]);
+    
+        socket.on("cartUpdated", handleCartUpdate);
+    
+        // Cleanup function to prevent multiple listeners
+        return () => {
+            socket.off("cartUpdated", handleCartUpdate);
+        };
+    }, []);
+
+
+    //
+    
+    
+    
 
     // Function to open the "Share & Join Cart" modal
     const openCartModal = () => {
@@ -169,6 +199,33 @@ const ItemsPage = () => {
             console.error("Error creating cart:", error);
         }
     };
+
+    // const [products, setProducts] = useState({});
+    const [newItems, setnewItems] = useState();
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            const newProducts = {};
+            for (const item_id of cartItems) {
+                try {
+                    const response = await fetch(`http://localhost:5001/product/${item_id}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch product ${item_id}`);
+                    }
+                    const data = await response.json();
+                    newProducts[item_id] = data;
+                } catch (error) {
+                    console.error("Error fetching product:", error);
+                }
+            }
+            console.log("-----" ,newProducts);
+            setnewItems(newProducts);
+        };
+
+        if (cartItems.length > 0) {
+            fetchProducts();
+        }
+    }, [cartItems]);
     
 
     // Function to Join an Existing Cart
@@ -186,14 +243,19 @@ const ItemsPage = () => {
 
     // Handle adding items
     const addItem = (item) => {
-        socket.emit("add-item", { cartID, item });
-    };
+        if (cartID) {
+            socket.emit("add-item", { cartID, item });
+        }
+    };  
 
     // Handle removing items
     const removeItem = (itemID) => {
-        socket.emit("remove-item", { cartID, itemID });
+        if (cartID) {
+            socket.emit("remove-item", { cartID, itemID });
+        }
     };
 
+    const [datai ,setDatai] = useState();
 
     const handleManualScroll = () => {
         setIsManualScroll(true);
@@ -215,42 +277,102 @@ const ItemsPage = () => {
         setIsTyping(value.trim() !== ''); // If input is not empty, set isTyping to true
     };
 
+    const[totalQuantity,setTotalQuantity] = useState(0);
+
+    const calculateTotalQuantity = (items) => {
+        if (!items || typeof items !== "object") return 0;
+        return Object.keys(items).length; // Count the number of keys (objects)
+    };
+    
+
+    useEffect(() => {
+        console.log("jahdjahsd", calculateTotalQuantity(newItems));
+        setTotalQuantity(calculateTotalQuantity(newItems));
+    }, [newItems]);
     // Function to Add/Remove Items in Cart
     const handleQuantityChange = (productId, type, delta, title, price) => {
+        if (!productId || !type) {
+            console.error("Invalid productId or type:", { productId, type });
+            return;
+        }
+    
         setCart((prevCart) => {
-            
-            const existingProduct = prevCart.find((item) => item.productId === productId && item.type === type);
+            const key = `${productId}-${type}`;
+            const existingProduct = prevCart.find((item) => item._id === productId && item.type === type);
             let newCart;
     
             if (existingProduct) {
-                const updatedQuantity = existingProduct.quantity + delta;
-                addItem(productId);
-                if (updatedQuantity <= 0) {
-                    newCart = prevCart.filter((item) => item.productId !== productId || item.type !== type);
+                const newQuantity = Math.max(existingProduct.quantity + delta, 0);
+    
+                if (newQuantity === 0) {
+                    newCart = prevCart.filter((item) => !(item._id === productId && item.type === type));
+                    removeItem(productId);
                 } else {
                     newCart = prevCart.map((item) =>
-                        item.productId === productId && item.type === type ? { ...item, quantity: updatedQuantity } : item
+                        item._id === productId && item.type === type
+                            ? { ...item, quantity: newQuantity }
+                            : item
                     );
+                    if(delta>0){
+                        addItem(productId);
+                    }
+                    else{
+                        removeItem(productId);
+                    }
                 }
             } else {
-                newCart = [...prevCart, { productId, title, type, price, quantity: 1 }];
-            }
-            
-            // Emit the updated cart to the server
-            if (cartID) {
-                socket.emit('update-cart', { cartID, item: { productId, title, type, price, quantity: newCart.find(i => i.productId === productId && i.type === type)?.quantity || 0 } });
-                console.log(newCart);
+                const product = products.find((prod) => prod._id === productId);
+                if (!product) {
+                    console.error("Product not found:", productId);
+                    return prevCart;
+                }
+    
+                newCart = [
+                    ...prevCart,
+                    {
+                        _id: productId,
+                        title: title || product.title,
+                        type,
+                        price: price || (type === "Half" ? product.halfPrice : product.fullPrice),
+                        quantity: 1,
+                    },
+                ];
+                addItem(productId);
             }
     
-            // Update quantityState after changing the cart
-            const updatedQuantityState = { ...quantityState };
-            updatedQuantityState[`${productId}-${type}`] = newCart.find(i => i.productId === productId && i.type === type)?.quantity || 0;
-            setQuantityState(updatedQuantityState);
+            // Always emit WebSocket update whenever quantity changes
+            if (cartID) {
+                const updatedItem = newCart.find((i) => i._id === productId && i.type === type);
+                socket.emit("update-cart", {
+                    cartID,
+                    item: updatedItem
+                        ? {
+                              _id: updatedItem._id,
+                              title: updatedItem.title || "Unknown",  // Ensure title is present
+                              type: updatedItem.type,
+                              price: updatedItem.price || 0,  // Ensure price is present
+                              quantity: updatedItem.quantity,
+                          }
+                        : { productId, type, quantity: 0 }, // Ensure removal is also sent
+                });
+                
+                console.log("Emitting update-cart:", updatedItem);
+
+                // Log for debugging
+                console.log(`WebSocket Event: update-cart`, {
+                    cartID,
+                    item: updatedItem || { productId, type, quantity: 0 },
+                });
+            }
+    
+            setQuantityState((prevState) => ({
+                ...prevState,
+                [key]: newCart.find((i) => i._id === productId && i.type === type)?.quantity || 0,
+            }));
     
             return newCart;
         });
-    };
-    
+    };    
     
 
     const toggleOrderSummary = () => {
@@ -597,7 +719,7 @@ const ItemsPage = () => {
                         alt="Cart"
                         className="cart-icon"
                     />
-                    <span className="cart-badge">{cart.reduce((total, item) => total + item.quantity, 0)}</span>
+                    <span className="cart-badge">{totalQuantity}</span>
                 </div>
                 <button onClick={toggleOrderSummary} className="summary-button">Order Summary ></button>
                 <button
@@ -637,20 +759,21 @@ const ItemsPage = () => {
                                     <th>Price</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {cart.map((item, index) => (
-                                    <tr key={`${item._id}-${item.type}`} className="order-item">
-                                        <td>{index + 1}</td>
-                                        <td>{item.title} ({item.type})</td>
-                                        <td className="quantity-controls">
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, -1)} className = "sPlus">-</button>
-                                            <span>{item.quantity}</span>
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, 1)} className = "sMinus">+</button>
-                                        </td>
-                                        <td>₹{item.price * item.quantity}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                                <tbody>
+                                {cartItems.map((item_id) => (
+                                    <div key={item_id}>
+                    {newItems[item_id] ? (
+                        <div>
+                            <h3>{newItems[item_id].title}</h3>
+                            <p>Price: ${newItems[item_id].fullPrice}</p>
+                            <img src={newItems[item_id].image} alt={newItems[item_id].name} width="100" />
+                        </div>
+                    ) : (
+                        <p>Loading product details...</p>
+                    )}
+                </div>
+            ))}
+                                </tbody>
                         </table>
                     </div>
                     <button

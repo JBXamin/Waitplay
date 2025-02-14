@@ -111,6 +111,31 @@ app.post("/create-cart", (req, res) => {
 });
 
 
+app.get('/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate if 'id' is a valid MongoDB ObjectId
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    const product = await Product.findById(id);
+    console.log(product);
+    
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error('Error fetching product:', err.message);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+  }
+});
+
+
+
 // API to Join a Cart
 app.post("/join-cart", (req, res) => {
   const { cartID } = req.body;

@@ -149,19 +149,43 @@ app.post("/join-cart", (req, res) => {
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  socket.on("joinCart", (cartID) => {
-      socket.join(cartID);
-      console.log(`User ${socket.id} joined cart ${cartID}`);
-  });
-
-  socket.on("add-item", ({ cartID, item }) => {
-    console.log(`Item added: ${item} in cart ${cartID}`);
+  socket.on("join-cart", ({cartID, userID}) => {
     
-    if(cartID==null)cartID="Vigi"
-    carts[cartID].items.push(item);
+    if(!userID || !cartID){
+      console.log("Error in userID and cartID");
+    }
+      socket.join(cartID);
+      console.log(`User ${userID} (${socket.id}) joined cart ${cartID}`);
 
     console.log(carts[cartID]);
+
+    if(!carts[cartID]) {
+        carts[cartID] = { items: [], users: [] };
+    }
+    if (!carts[cartID].users.includes(userID)) {
+      carts[cartID].users.unshift(userID); // Latest user appears first
+    }
+
     io.to(cartID).emit("cartUpdated", carts[cartID]);
+
+  });
+
+  socket.on("add-item", ({ cartID, userID, item }) => {
+    console.log(`Item added: ${item} in cart ${cartID}`);
+    
+    if (!cartID || !userID || !item) {
+      console.log("Error: Missing cartID, userID, or itemID");
+      return;
+  }
+
+  if (!carts[cartID]) {
+    carts[cartID] = { item: [], users: [] };
+  }
+
+  carts[cartID].items.push({item: item, userID});
+
+  console.log(carts[cartID]);
+  io.to(cartID).emit("cartUpdated", carts[cartID]);
 });
 
 socket.on("remove-item", ({ cartID, itemID }) => {

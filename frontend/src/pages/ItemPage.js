@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import socket from './socket';  // Move up one directory
 import './ItemPage.css';
 
 const ItemsPage = () => {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [cart, setCart] = useState([]);
+    const [items, setItems] = useState([]);
+    const [cartItems, setCartItems] = useState([]);
+    const [cartID, setCartID] = useState(null);
+    const [isCartModalOpen, setCartModalOpen] = useState(false);
+    const [inputCartID, setInputCartID] = useState('');
     const [quantityState, setQuantityState] = useState({});
     const [showOrderSummary, setShowOrderSummary] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -26,18 +31,6 @@ const ItemsPage = () => {
     const category = queryParams.get('category');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const navigate = useNavigate();
-    const [showModal, setShowModal] = useState(false);
-    const [cartId, setCartId] = useState('');
-    const [qrCode, setQrCode] = useState('');
-    const [joinCartId, setJoinCartId] = useState('');
-    const [cartData, setCartData] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const socket = io('http://localhost:5000', {
-        withCredentials: true, // Include credentials (if needed)
-      });
-
     const handlePlayOrder = () => {
         if (cart.length > 0) {
             navigate('/waitplay'); // Adjust the route path if needed
@@ -46,9 +39,48 @@ const ItemsPage = () => {
         }
     };
 
+    const [userID] = useState(() => {
+        const storedID = localStorage.getItem("userID");
+        if (storedID) return storedID;
+    
+        const newID = Math.random().toString(36).substring(2, 10);
+        localStorage.setItem("userID", newID);
+        return newID;
+    });
+
+    useEffect(() => {
+        if (!cartID || !userID) return;
+    
+        socket.emit("join-cart", {cartID, userID});
+        console.log(`abcd User ${userID} joined the cart ${cartID}`);
+        console.log(cart); // Log the cart to debug
+    
+        // Listen for updates
+        socket.on("update-cart", (data) => {
+            console.log("Received cart update event:", data);
+    
+            if (data.action === "add") {
+                console.log("aaaaaa" ,data.items);
+                setCart(data.items); // Add new item
+            // } else if (data.action === "remove") {
+            //     setCart((prev) => prev.filter(item => item.id !== data.itemID)); // Remove item
+            }
+    
+            if (Array.isArray(data.items)) {
+                setCart(data.items); // Update with the correct array
+            } else {
+                console.error("Received data is not an array:", data.items);
+            }
+        });
+    
+        return () => {
+            socket.off("update-cart"); // Cleanup
+        };
+    }, [cartID, userID, cart]);    
+
     useEffect(() => {
         axios
-          .get(`http://localhost:5000/products?type=${type}`)
+          .get(`http://localhost:5001/products?type=${type}`)
           .then((response) => setProducts(response.data))
           .catch((error) => console.error('Error fetching products:', error));
       }, [type]);
@@ -60,7 +92,7 @@ const ItemsPage = () => {
                 if (type && type !== 'all') params.append('type', type.toLowerCase());
                 if (category && category !== 'all') params.append('category', category.toLowerCase());
     
-                const categoryResponse = await axios.get(`http://localhost:5000/categories?type=${type}`);
+                const categoryResponse = await axios.get(`http://localhost:5001/categories?type=${type}`);
                 setCategories(categoryResponse.data);
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -73,12 +105,12 @@ const ItemsPage = () => {
     useEffect(() => {
         if (searchQuery.trim() !== '') {
             axios
-                .get(`http://localhost:5000/api/search?q=${searchQuery}`)
+                .get(`http://localhost:5001/api/search?q=${searchQuery}`)
                 .then((response) => setProducts(response.data))
                 .catch((error) => console.error('Error fetching search results:', error));
         } else {
             axios
-                .get(`http://localhost:5000/products?type=${type}`)
+                .get(`http://localhost:5001/products?type=${type}`)
                 .then((response) => setProducts(response.data))
                 .catch((error) => console.error('Error fetching products:', error));
         }
@@ -124,46 +156,129 @@ const ItemsPage = () => {
         }, 5000); // Change every 5 seconds
       
         return () => clearInterval(interval); // Cleanup on unmount
-      }, [index, products]);  
-    
-    //   useEffect(() => {
-    //     if (joinCartId) {
-    //       // Join the cart room
-    //       socket.emit('join-cart', joinCartId);
+      }, [index, products]); 
       
-    //       // Listen for cart updates
-    //       socket.on('cart-updated', (updatedCart) => {
-    //         if (updatedCart.cartId === joinCartId) {
-    //           setCartData(updatedCart);
-    //           setCart(updatedCart.items);
-    //         }
-    //       });
-      
-    //       // Cleanup on component unmount
-    //       return () => {
-    //         socket.off('cart-updated');
-    //       };
-    //     }
-    //   }, [joinCartId, socket]);
-
-    // React client-side code
-    useEffect(() => {
-        const socket = io('http://localhost:5000'); // Connect to the Socket.IO server
+      useEffect(() => {
+        const handleCartUpdate = (updatedItems) => {
+            console.log("Received cart update from WebSocket:", updatedItems);
     
-        // Join the cart room
-        socket.emit('join-cart', { cartId: 'your-cart-id' });
+            if (!Array.isArray(updatedItems.items)) {
+                console.log("updatedItems type: ", typeof updatedItems);
+                console.error("Expected an array but received:", updatedItems);
+                return;
+            }
     
-        // Listen for cart updates
-        socket.on('cart-updated', (updatedCart) => {
-        setCart(updatedCart.items); // Update the local cart state
-        });
+            // Remove duplicate items before updating state
+            const uniqueItems = [...new Set(updatedItems.items.map(item => JSON.stringify(item)))]
+                .map(str => JSON.parse(str));
     
-        // Cleanup on component unmount
+            console.log("Filtered items:", uniqueItems);
+            setCartItems(uniqueItems);
+        };
+    
+        socket.on("cartUpdated", handleCartUpdate);
+    
+        // Cleanup function to prevent multiple listeners
         return () => {
-        socket.disconnect();
+            socket.off("cartUpdated", handleCartUpdate);
         };
     }, []);
+
+    // Function to open the "Share & Join Cart" modal
+    const openCartModal = () => {
+        setCartModalOpen(true);
+    };
+
+    // Function to close the modal
+    const closeCartModal = () => {
+        setCartModalOpen(false);
+    };
+
+    const handleCreateCart = async () => {
+        try {
+            const response = await axios.post("http://localhost:5001/create-cart");
+            setCartID(response.data.cartID);
+            socket.emit("joinCart", response.data.cartID); // Join WebSocket room
+        } catch (error) {
+            console.error("Error creating cart:", error);
+        }
+    };
+
+    // const [products, setProducts] = useState({});
+    const [newItems, setnewItems] = useState();
+
+    useEffect(() => {
+        if (!Array.isArray(cartItems) || cartItems.length === 0) return;
     
+        const fetchProducts = async () => {
+            try {
+                const newProducts = {};
+                const promises = [];
+    
+                for (const item of cartItems) {
+                    const item_id = item.item; // Extract item ID
+    
+                    // Push the fetch request into an array (not waiting here)
+                    const fetchPromise = fetch(`http://localhost:5001/product/${item_id}`)
+                        .then(response => {
+                            if (!response.ok) throw new Error(`Failed to fetch product ${item_id}`);
+                            return response.json();
+                        })
+                        .then(data => {
+                            newProducts[item_id] = {
+                                ...data,
+                                newQuantity: item.quantity ?? 1, // Attach quantity from cartItems
+                            };
+                        })
+                        .catch(error => {
+                            console.error("Error fetching product:", error);
+                        });
+    
+                    promises.push(fetchPromise);
+                }
+    
+                // Wait for all fetches to complete
+                await Promise.all(promises);
+    
+                console.log("Fetched Products:", newProducts);
+                setnewItems(newProducts);
+            } catch (error) {
+                console.error("Error fetching products:", error);
+            }
+        };
+    
+        fetchProducts();
+    }, [cartItems]);       
+    
+    // Function to Join an Existing Cart
+    const handleJoinCart = async () => {
+        if (!inputCartID) return alert('Please enter a Cart ID');
+        try {
+            const response = await axios.post("http://localhost:5001/join-cart", { cartID: inputCartID });
+            setCartID(inputCartID);
+            setItems(response.data.items);
+            socket.emit("joinCart", inputCartID); // Join WebSocket room
+        } catch (error) {
+            console.error("Error joining cart:", error);
+        }
+    };
+
+    // Handle adding items
+    const addItem = (item) => {
+        if (cartID) {
+            socket.emit("add-item", { cartID, userID, item });
+        }
+    };  
+
+    // Handle removing items
+    const removeItem = (itemID) => {
+        if (cartID) {
+            socket.emit("remove-item", { cartID, itemID });
+        }
+    };
+
+    const [datai ,setDatai] = useState();
+
     const handleManualScroll = () => {
         setIsManualScroll(true);
         setTimeout(() => setIsManualScroll(false), 10000);
@@ -178,94 +293,109 @@ const ItemsPage = () => {
         }
     };
 
-    const handleShareCart = async () => {
-        setIsLoading(true);
-        setError('');
-      
-        try {
-          const userId = "user123"; // Replace with dynamic user ID from your app
-          const response = await axios.post('http://localhost:5000/create-cart', { userId });
-          setCartId(response.data.cartId);
-          setQrCode(response.data.qrCode);
-        } catch (error) {
-          console.error('Error creating cart:', error);
-          setError('Failed to create cart. Please try again.');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      const handleJoinCart = async () => {
-        setIsLoading(true);
-        setError('');
-      
-        try {
-          const userId = "user123"; // Replace with dynamic user ID from your app
-          await axios.post('http://localhost:5000/join-cart', { cartId: joinCartId, userId });
-          alert(`Successfully joined cart with ID: ${joinCartId}`);
-        } catch (error) {
-          console.error('Error joining cart:', error);
-          setError('Failed to join cart. Please try again.');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
     const handleChange = (e) => {
         const value = e.target.value;
         setSearchQuery(value);
         setIsTyping(value.trim() !== ''); // If input is not empty, set isTyping to true
     };
 
-    const handleQuantityChange = (productId, type, delta) => {
-        setQuantityState((prevState) => {
-          const key = `${productId}-${type}`;
-          const newQuantity = Math.max((prevState[key] || 0) + delta, 0);
-      
-          if (newQuantity === 0) {
-            setCart((prevCart) => prevCart.filter(item => !(item._id === productId && item.type === type)));
-          } else {
-            setCart((prevCart) => {
-              const existingProduct = prevCart.find(
-                (item) => item._id === productId && item.type === type
-              );
-              if (existingProduct) {
-                return prevCart.map((item) =>
-                  item._id === productId && item.type === type
-                    ? { ...item, quantity: newQuantity }
-                    : item
-                );
-              } else {
+    const[totalQuantity,setTotalQuantity] = useState(0);
+
+    const calculateTotalQuantity = (items) => {
+        if (!items || typeof items !== "object") return 0;
+        return Object.keys(items).length; // Count the number of keys (objects)
+    };
+    
+
+    useEffect(() => {
+        console.log("jahdjahsd", calculateTotalQuantity(newItems));
+        setTotalQuantity(calculateTotalQuantity(newItems));
+    }, [newItems]);
+    // Function to Add/Remove Items in Cart
+    const handleQuantityChange = (productId, type, delta, title, price) => {
+        if (!productId || !type) {
+            console.error("Invalid productId or type:", { productId, type });
+            return;
+        }
+    
+        setCart((prevCart) => {
+            const key = `${productId}-${type}`;
+            const existingProduct = prevCart.find((item) => item._id === productId && item.type === type);
+            let newCart;
+    
+            if (existingProduct) {
+                const newQuantity = Math.max(existingProduct.quantity + delta, 0);
+    
+                if (newQuantity === 0) {
+                    newCart = prevCart.filter((item) => !(item._id === productId && item.type === type));
+                    removeItem(productId);
+                } else {
+                    newCart = prevCart.map((item) =>
+                        item._id === productId && item.type === type
+                            ? { ...item, quantity: newQuantity }
+                            : item
+                    );
+                    if(delta>0){
+                        addItem(productId);
+                    }
+                    else{
+                        removeItem(productId);
+                    }
+                }
+            } else {
                 const product = products.find((prod) => prod._id === productId);
-                return [
-                  ...prevCart,
-                  {
-                    _id: productId,
-                    title: product.title,
-                    type,
-                    price: type === 'Half' ? product.halfPrice : product.fullPrice,
-                    quantity: newQuantity,
-                  },
+                if (!product) {
+                    console.error("Product not found:", productId);
+                    return prevCart;
+                }
+    
+                newCart = [
+                    ...prevCart,
+                    {
+                        _id: productId,
+                        title: title || product.title,
+                        type,
+                        price: price || (type === "Half" ? product.halfPrice : product.fullPrice),
+                        quantity: 1,
+                    },
                 ];
-              }
-            });
-          }
-      
-          // Send the updated cart to the server
-          if (joinCartId) {
-            socket.emit('update-cart', {
-              cartId: joinCartId,
-              item: {
-                itemName: productId,
-                quantity: newQuantity,
-                addedBy: 'user123', // Replace with dynamic user ID
-              },
-            });
-          }
-      
-          return { ...prevState, [key]: newQuantity };
+                addItem(productId);
+            }
+    
+            // Always emit WebSocket update whenever quantity changes
+            if (cartID) {
+                const updatedItem = newCart.find((i) => i._id === productId && i.type === type);
+                socket.emit("update-cart", {
+                    cartID,
+                    item: updatedItem
+                        ? {
+                              _id: updatedItem._id,
+                              title: updatedItem.title || "Unknown",  // Ensure title is present
+                              type: updatedItem.type,
+                              price: updatedItem.price || 0,  // Ensure price is present
+                              quantity: updatedItem.quantity,
+                          }
+                        : { productId, type, quantity: 0 }, // Ensure removal is also sent
+                });
+                
+                console.log("Emitting update-cart:", updatedItem);
+
+                // Log for debugging
+                console.log(`WebSocket Event: update-cart`, {
+                    cartID,
+                    item: updatedItem || { productId, type, quantity: 0 },
+                });
+            }
+    
+            setQuantityState((prevState) => ({
+                ...prevState,
+                [key]: newCart.find((i) => i._id === productId && i.type === type)?.quantity || 0,
+            }));
+    
+            return newCart;
         });
-      };
+    };    
+    
 
     const toggleOrderSummary = () => {
         setShowOrderSummary(!showOrderSummary);
@@ -315,83 +445,50 @@ const ItemsPage = () => {
         <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>Logo</span>
     </div>
 
-    <div>
-            {/* Main Button */}
-            <button
-                style={{
-                    background: 'linear-gradient(to right, #f54ea2, #ff7676)',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '20px',
-                    color: '#fff',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    paddingRight: '4%',
-                    marginRight: '3%',
-                    zIndex:-1,
-                }}
-                onClick={() => setShowModal(true)}
-            >
-                Share or Join Cart
-            </button>
-
-            {/* Modal for Share/Join Actions */}
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <h3 className="modal-title">Share or Join a Cart</h3>
-                        <div className="modal-actions">
-                        <button className="btn btn-share" onClick={handleShareCart}>
-                            Share Cart
-                        </button>
-                        <button
-                            className="btn btn-join-info"
-                            onClick={() => alert('Enter Cart ID to Join')}
-                        >
-                            Join Cart
-                        </button>
-                        </div>
-
-                        {cartId && (
-                        <div className="cart-info">
-                            <h4>Cart ID: {cartId}</h4>
-                            <img src={qrCode} alt="QR Code" className="qr-code" />
-                        </div>
-                        )}
-
-                        <div className="join-cart-input">
-                        <input
-                            type="text"
-                            placeholder="Enter Cart ID to Join"
-                            value={joinCartId}
-                            onChange={(e) => setJoinCartId(e.target.value)}
-                            className="input"
-                        />
-                        <button className="btn btn-join" onClick={handleJoinCart}>
-                            Join
-                        </button>
-                        </div>
-
-                        {cartData && (
-                        <div>
-                            <h4>Cart Data:</h4>
-                            <ul>
-                            {cartData.items.map((item, index) => (
-                                <li key={index}>{item.itemName} - {item.quantity}</li>
-                            ))}
-                            </ul>
-                        </div>
-                        )}
-
-                        <button className="btn btn-close" onClick={() => setShowModal(false)}>
-                        Close
-                        </button>
-                    </div>
-                    </div>
-                )}
-        </div>
+    {/* Share or Join Cart Button */}
+    <button
+    onClick={openCartModal}
+        style={{
+            background: 'linear-gradient(to right, #f54ea2, #ff7676)',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            color: '#fff',
+            fontSize: '14px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            paddingRight: "4%",
+            marginRight:"3%",
+        }}
+    >
+        Share or Join Cart
+    </button>
 </header>
+{/*  Cart Modal */}
+{isCartModalOpen && (
+                <div className="modal">
+                    <div className="modal-content">
+                        <h2>Share or Join Cart</h2>
+                        {!cartID ? (
+                            <>
+                                <button onClick={handleCreateCart}>Create & Share Cart</button>
+                                <hr />
+                                <input
+                                    type="text"
+                                    placeholder="Enter Cart ID"
+                                    value={inputCartID}
+                                    onChange={(e) => setInputCartID(e.target.value)}
+                                />
+                                <button onClick={handleJoinCart}>Join Cart</button>
+                            </>
+                        ) : (
+                            <p>Your Cart ID: <strong>{cartID}</strong></p>
+                        )}
+                        <button onClick={closeCartModal}>Close</button>
+                    </div>
+                </div>
+            )}
+
 
 <div className="search-and-call" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#000', color: '#fff', marginTop: '-1px', width:"100%" }}>
     {/* Search Bar */}
@@ -541,72 +638,82 @@ const ItemsPage = () => {
 
 {/* </div> */}
 
+<main className="product-list">
+    {filteredProducts.map((product) => {
+        const halfKey = `${product._id}-Half`;
+        const fullKey = `${product._id}-Full`;
 
-            <main className="product-list">
-                {filteredProducts.map((product) => (
-                    <div className="product-card" key={product._id}>
-                        <div className="product-image-container" style={{ width: '200px', height: '200px' }}>
-                            <img
-                                className="product-image"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                src={product.image}
-                                alt={product.title}
-                            />
+        return (
+            <div className="product-card" key={product._id}>
+                <div className="product-image-container" style={{ width: '200px', height: '200px' }}>
+                    <img
+                        className="product-image"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        src={product.image}
+                        alt={product.title}
+                    />
+                </div>
+                <div className="product-details">
+                    <div className="product-header">
+                        <h3 className="product-title">{product.title}</h3>
+                        <span className="product-time">20min</span>
+                    </div>
+                    <p className="product-description">
+                        {product.description} <span className="know-more" onClick={() => showProductDetails(product)}>...more</span>
+                    </p>
+                    <div className="product-prices">
+                        <span className="price">@{product.halfPrice} Half</span>
+                        <span className="price">@{product.fullPrice} Full</span>
+                    </div>
+
+                    {/* Quantity Controls (Now using WebSocket) */}
+                    <div className="product-actions">
+                        <div
+                            className="quantity-control"
+                            style={{
+                                backgroundColor: quantityState[halfKey] > 0 ? 'rgba(255, 182, 193, 0.8)' : '#f9f9f9',
+                                border: quantityState[halfKey] > 0 ? '1px solid #ff6f61' : '1px solid #ddd',
+                            }}
+                        >
+                            <span>Half</span>
+                            <button onClick={() => handleQuantityChange(product._id, 'Half', -1, product.title, product.halfPrice)}>-</button>
+                            <span>{quantityState[halfKey] || 0}</span>
+                            <button onClick={() => handleQuantityChange(product._id, 'Half', 1, product.title, product.halfPrice)}>+</button>
                         </div>
-                        <div className="product-details">
-                            <div className="product-header">
-                                <h3 className="product-title">{product.title}</h3>
-                                <span className="product-time">20min</span>
-                            </div>
-                            <p className="product-description">
-                                {product.description} <span className="know-more" onClick={() => showProductDetails(product)}>...more</span>
-                            </p>
-                            <div className="product-prices">
-                                <span className="price">@{product.halfPrice} Half</span>
-                                <span className="price">@{product.fullPrice} Full</span>
-                            </div>
-                            <div className="product-actions">
-                                <div
-                                    className="quantity-control"
-                                    style={{
-                                        backgroundColor: quantityState[`${product._id}-Half`] > 0 ? 'rgba(255, 182, 193, 0.8)' : '#f9f9f9',
-                                        border: quantityState[`${product._id}-Half`] > 0 ? '1px solid #ff6f61' : '1px solid #ddd',
-                                    }}
-                                >
-                                    <span>Half</span>
-                                    <button onClick={() => handleQuantityChange(product._id, 'Half', -1)}>-</button>
-                                    <span>{quantityState[`${product._id}-Half`] || 0}</span>
-                                    <button onClick={() => handleQuantityChange(product._id, 'Half', 1)}>+</button>
-                                </div>
-                                <div
-                                    className="quantity-control"
-                                    style={{
-                                        backgroundColor: quantityState[`${product._id}-Full`] > 0 ? 'rgba(173, 216, 230, 0.8)' : '#f9f9f9',
-                                        border: quantityState[`${product._id}-Full`] > 0 ? '1px solid #61a6ff' : '1px solid #ddd',
-                                    }}
-                                >
-                                    <span>Full</span>
-                                    <button onClick={() => handleQuantityChange(product._id, 'Full', -1)}>-</button>
-                                    <span>{quantityState[`${product._id}-Full`] || 0}</span>
-                                    <button onClick={() => handleQuantityChange(product._id, 'Full', 1)}>+</button>
-                                </div>
-                            </div>
-                            <textarea
-                                className="notes-input"
-                                style={{
-                                    backgroundColor: cart.find(item => item._id === product._id) ? 'rgba(240, 248, 255, 0.5)' : '#fff',
-                                    border: '1px solid #ddd',
-                                    width: '100%',
-                                    marginTop: '10px',
-                                    padding: '10px',
-                                    borderRadius: '5px',
-                                }}
-                                placeholder="Note to chef"
-                            ></textarea>
+
+                        <div
+                            className="quantity-control"
+                            style={{
+                                backgroundColor: quantityState[fullKey] > 0 ? 'rgba(173, 216, 230, 0.8)' : '#f9f9f9',
+                                border: quantityState[fullKey] > 0 ? '1px solid #61a6ff' : '1px solid #ddd',
+                            }}
+                        >
+                            <span>Full</span>
+                            <button onClick={() => handleQuantityChange(product._id, 'Full', -1, product.title, product.fullPrice)}>-</button>
+                            <span>{quantityState[fullKey] || 0}</span>
+                            <button onClick={() => handleQuantityChange(product._id, 'Full', 1, product.title, product.fullPrice)}>+</button>
                         </div>
                     </div>
-                ))}
-            </main>
+
+                    {/*  Note to Chef */}
+                    <textarea
+                        className="notes-input"
+                        style={{
+                            backgroundColor: cart.find(item => item.productId === product._id) ? 'rgba(240, 248, 255, 0.5)' : '#fff',
+                            border: '1px solid #ddd',
+                            width: '100%',
+                            marginTop: '10px',
+                            padding: '10px',
+                            borderRadius: '5px',
+                        }}
+                        placeholder="Note to chef"
+                    ></textarea>
+                </div>
+            </div>
+        );
+    })}
+</main>
+
 
             {selectedProduct && (
                 <div className="popup-overlay">
@@ -634,7 +741,7 @@ const ItemsPage = () => {
                         alt="Cart"
                         className="cart-icon"
                     />
-                    <span className="cart-badge">{cart.reduce((total, item) => total + item.quantity, 0)}</span>
+                    <span className="cart-badge">{totalQuantity}</span>
                 </div>
                 <button onClick={toggleOrderSummary} className="summary-button">Order Summary ></button>
                 <button
@@ -666,26 +773,46 @@ const ItemsPage = () => {
                             <div className="summary-text">Order Summary </div>
                             <button onClick={toggleOrderSummary} className="close-summary">X</button>
                         </div>
-                        <table className="order-list">
+                        <table>
                             <thead>
                                 <tr>
+                                    <th>User</th>
                                     <th>Item</th>
                                     <th>Quantity</th>
                                     <th>Price</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {cart.map((item, index) => (
-                                    <tr key={`${item._id}-${item.type}`} className="order-item">
-                                        <td>{index + 1}</td>
-                                        <td>{item.title} ({item.type})</td>
-                                        <td className="quantity-controls">
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, -1)} className = "sPlus">-</button>
-                                            <span>{item.quantity}</span>
-                                            <button onClick={() => handleQuantityChange(item._id, item.type, 1)} className = "sMinus">+</button>
-                                        </td>
-                                        <td>₹{item.price * item.quantity}</td>
-                                    </tr>
+                                {Object.entries(
+                                    cartItems.reduce((acc, { item, userID }) => {
+                                        if (!acc[userID]) {
+                                            acc[userID] = [];
+                                        }
+                                        acc[userID].push(item);
+                                        return acc;
+                                    }, {})
+                                ).map(([userID, items]) => (
+                                    <React.Fragment key={userID}>
+                                        <tr>
+                                            <td colSpan="4">
+                                                <strong>User: {userID}</strong>
+                                            </td>
+                                        </tr>
+                                        {items.map((item_id, index) => (
+                                            newItems[item_id] ? (
+                                                <tr key={`${userID}-${item_id}`}>
+                                                    <td></td> {/* Empty cell for spacing */}
+                                                    <td>{index + 1}. {newItems[item_id].title} ({newItems[item_id].type})</td>
+                                                    <td>{newItems[item_id].newQuantity ?? "N/A"}</td>
+                                                    <td>₹{newItems[item_id].fullPrice}</td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={`${userID}-${item_id}-loading`}>
+                                                    <td colSpan="4">Loading product details...</td>
+                                                </tr>
+                                            )
+                                        ))}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>

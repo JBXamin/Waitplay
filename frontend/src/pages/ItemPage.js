@@ -14,7 +14,6 @@ const ItemsPage = () => {
     const [cartID, setCartID] = useState(null);
     const [isCartModalOpen, setCartModalOpen] = useState(false);
     const [inputCartID, setInputCartID] = useState('');
-    const [userID] = useState(Math.random().toString(36).substring(2, 10)); // Generate temporary user ID
     const [quantityState, setQuantityState] = useState({});
     const [showOrderSummary, setShowOrderSummary] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -39,10 +38,21 @@ const ItemsPage = () => {
             alert('Your cart is empty. Add items to play the order.');
         }
     };
-    useEffect(() => {
-        if (!cartID) return;
+
+    const [userID] = useState(() => {
+        const storedID = localStorage.getItem("userID");
+        if (storedID) return storedID;
     
-        socket.emit("join-cart", cartID);
+        const newID = Math.random().toString(36).substring(2, 10);
+        localStorage.setItem("userID", newID);
+        return newID;
+    });
+
+    useEffect(() => {
+        if (!cartID || !userID) return;
+    
+        socket.emit("join-cart", {cartID, userID});
+        console.log(`abcd User ${userID} joined the cart ${cartID}`);
         console.log(cart); // Log the cart to debug
     
         // Listen for updates
@@ -66,7 +76,7 @@ const ItemsPage = () => {
         return () => {
             socket.off("update-cart"); // Cleanup
         };
-    }, [cartID, cart]);    
+    }, [cartID, userID, cart]);    
 
     useEffect(() => {
         axios
@@ -174,12 +184,6 @@ const ItemsPage = () => {
         };
     }, []);
 
-
-    //
-    
-    
-    
-
     // Function to open the "Share & Join Cart" modal
     const openCartModal = () => {
         setCartModalOpen(true);
@@ -204,30 +208,48 @@ const ItemsPage = () => {
     const [newItems, setnewItems] = useState();
 
     useEffect(() => {
-        const fetchProducts = async () => {
-            const newProducts = {};
-            for (const item_id of cartItems) {
-                try {
-                    const response = await fetch(`http://localhost:5001/product/${item_id}`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch product ${item_id}`);
-                    }
-                    const data = await response.json();
-                    newProducts[item_id] = data;
-                } catch (error) {
-                    console.error("Error fetching product:", error);
-                }
-            }
-            console.log("-----" ,newProducts);
-            setnewItems(newProducts);
-        };
-
-        if (cartItems.length > 0) {
-            fetchProducts();
-        }
-    }, [cartItems]);
+        if (!Array.isArray(cartItems) || cartItems.length === 0) return;
     
-
+        const fetchProducts = async () => {
+            try {
+                const newProducts = {};
+                const promises = [];
+    
+                for (const item of cartItems) {
+                    const item_id = item.item; // Extract item ID
+    
+                    // Push the fetch request into an array (not waiting here)
+                    const fetchPromise = fetch(`http://localhost:5001/product/${item_id}`)
+                        .then(response => {
+                            if (!response.ok) throw new Error(`Failed to fetch product ${item_id}`);
+                            return response.json();
+                        })
+                        .then(data => {
+                            newProducts[item_id] = {
+                                ...data,
+                                newQuantity: item.quantity ?? 1, // Attach quantity from cartItems
+                            };
+                        })
+                        .catch(error => {
+                            console.error("Error fetching product:", error);
+                        });
+    
+                    promises.push(fetchPromise);
+                }
+    
+                // Wait for all fetches to complete
+                await Promise.all(promises);
+    
+                console.log("Fetched Products:", newProducts);
+                setnewItems(newProducts);
+            } catch (error) {
+                console.error("Error fetching products:", error);
+            }
+        };
+    
+        fetchProducts();
+    }, [cartItems]);       
+    
     // Function to Join an Existing Cart
     const handleJoinCart = async () => {
         if (!inputCartID) return alert('Please enter a Cart ID');
@@ -244,7 +266,7 @@ const ItemsPage = () => {
     // Handle adding items
     const addItem = (item) => {
         if (cartID) {
-            socket.emit("add-item", { cartID, item });
+            socket.emit("add-item", { cartID, userID, item });
         }
     };  
 
@@ -751,29 +773,48 @@ const ItemsPage = () => {
                             <div className="summary-text">Order Summary </div>
                             <button onClick={toggleOrderSummary} className="close-summary">X</button>
                         </div>
-                        <table className="order-list">
+                        <table>
                             <thead>
                                 <tr>
+                                    <th>User</th>
                                     <th>Item</th>
                                     <th>Quantity</th>
                                     <th>Price</th>
                                 </tr>
                             </thead>
-                                <tbody>
-                                {cartItems.map((item_id) => (
-                                    <div key={item_id}>
-                    {newItems[item_id] ? (
-                        <div>
-                            <h3>{newItems[item_id].title}</h3>
-                            <p>Price: ${newItems[item_id].fullPrice}</p>
-                            <img src={newItems[item_id].image} alt={newItems[item_id].name} width="100" />
-                        </div>
-                    ) : (
-                        <p>Loading product details...</p>
-                    )}
-                </div>
-            ))}
-                                </tbody>
+                            <tbody>
+                                {Object.entries(
+                                    cartItems.reduce((acc, { item, userID }) => {
+                                        if (!acc[userID]) {
+                                            acc[userID] = [];
+                                        }
+                                        acc[userID].push(item);
+                                        return acc;
+                                    }, {})
+                                ).map(([userID, items]) => (
+                                    <React.Fragment key={userID}>
+                                        <tr>
+                                            <td colSpan="4">
+                                                <strong>User: {userID}</strong>
+                                            </td>
+                                        </tr>
+                                        {items.map((item_id, index) => (
+                                            newItems[item_id] ? (
+                                                <tr key={`${userID}-${item_id}`}>
+                                                    <td></td> {/* Empty cell for spacing */}
+                                                    <td>{index + 1}. {newItems[item_id].title} ({newItems[item_id].type})</td>
+                                                    <td>{newItems[item_id].newQuantity ?? "N/A"}</td>
+                                                    <td>₹{newItems[item_id].fullPrice}</td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={`${userID}-${item_id}-loading`}>
+                                                    <td colSpan="4">Loading product details...</td>
+                                                </tr>
+                                            )
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
                         </table>
                     </div>
                     <button
